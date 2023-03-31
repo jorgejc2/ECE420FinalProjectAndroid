@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "/home/jorgejc2/Documents/PersonalProjects/A_Guide_to_Running_Tensorflow_Models_on_Android/mnistandroid/app/build/intermediates/incremental/mergeDebugResources/merged.dir/values-v22/values-v22.xml",
+            "map": [
+                {
+                    "source": "/home/jorgejc2/.gradle/caches/transforms-3/c6de6590113a5baa892a55c56664ea0f/transformed/appcompat-v7-25.3.1/res/values-v22/values-v22.xml",
+                    "from": {
+                        "startLines": "2,3,4,9",
+                        "startColumns": "4,4,4,4",
+                        "startOffsets": "55,130,217,553",
+                        "endLines": "2,3,8,13",
+                        "endColumns": "74,86,12,12",
+                        "endOffsets": "125,212,548,896"
+                    }
+                }
+            ]
+        }
+    ]
+}
