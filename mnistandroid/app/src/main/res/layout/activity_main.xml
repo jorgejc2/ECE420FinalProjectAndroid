@@ -46,4 +46,10 @@
         android:layout_height="150dp"
         android:paddingLeft="10dp"
         android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <TextView
+        android:id="@+id/statusView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/init_status" />
 </LinearLayout>

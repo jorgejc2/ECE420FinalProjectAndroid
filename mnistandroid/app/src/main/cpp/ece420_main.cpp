@@ -11,7 +11,7 @@
 // JNI Function
 extern "C" {
 JNIEXPORT void JNICALL
-Java_com_ece420_lab5_MainActivity_writeNewFreq(JNIEnv *env, jclass, jint);
+Java_mariannelinhares_mnistandroid_MainActivity_writeNewFreq(JNIEnv *env, jclass, jint);
 }
 
 // Student Variables
@@ -286,7 +286,7 @@ void overlapAddArray(float *dest, float *src, int startIdx, int len) {
 
 
 JNIEXPORT void JNICALL
-Java_com_ece420_lab5_MainActivity_writeNewFreq(JNIEnv *env, jclass, jint newFreq) {
+Java_mariannelinhares_mnistandroid_MainActivity_writeNewFreq(JNIEnv *env, jclass, jint newFreq) {
     FREQ_NEW_ANDROID = (int) newFreq;
     return;
 }
