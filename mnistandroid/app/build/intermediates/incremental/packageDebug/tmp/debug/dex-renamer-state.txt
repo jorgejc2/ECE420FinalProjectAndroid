@@ -1,4 +1,0 @@
-#Thu Mar 30 22:32:35 CDT 2023
-base.0=/home/jorgejc2/Documents/PersonalProjects/A_Guide_to_Running_Tensorflow_Models_on_Android/mnistandroid/app/build/intermediates/dex/debug/mergeDexDebug/classes.dex
-renamed.0=classes.dex
-path.0=classes.dex
