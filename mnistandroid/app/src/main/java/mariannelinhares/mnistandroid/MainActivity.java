@@ -43,6 +43,7 @@ import android.view.MotionEvent;
 // A View occupies a rectangular area on the screen and is responsible for drawing
 import android.view.View;
 //A user interface element the user can tap or click to perform an action.
+import android.view.WindowManager;
 import android.widget.Button;
 //A user interface element that displays text to the user. To provide user-editable text, see EditText.
 import android.widget.TextView;
@@ -108,14 +109,17 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     protected void onCreate(Bundle savedInstanceState) {
         //initialization
         super.onCreate(savedInstanceState);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.activity_main);
 
     /**********************************************************************************************/
     /**                                 LAB 5 SETUP                                              **/
         // Google NDK Stuff
-//        controlButton = (Button)findViewById((R.id.capture_control_button));
-//        statusView = (TextView)findViewById(R.id.statusView);
+        controlButton = (Button)findViewById((R.id.capture_control_button));
+        statusView = (TextView)findViewById(R.id.statusView);
         queryNativeAudioParameters();
+        // initialize native audio system
+        updateNativeAudioUI();
         if (supportRecording) {
             // Native Setting: 48k Hz Sampling Frequency and 128 Frame Size
             createSLEngine(Integer.parseInt(nativeSampleRate), FRAME_SIZE);
