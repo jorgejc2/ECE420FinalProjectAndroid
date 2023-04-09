@@ -151,6 +151,10 @@ Java_mariannelinhares_mnistandroid_MainActivity_createAudioRecorder(JNIEnv *env,
     if(!engine.recorder_) {
         return JNI_FALSE;
     }
+
+    // initialize the csv_log object
+    csv_log = new AndroidLog();
+
     engine.recorder_->SetBufQueues(engine.freeBufQueue_, engine.recBufQueue_);
     engine.recorder_->RegisterCallback(EngineService, (void*)&engine);
     return JNI_TRUE;
@@ -161,6 +165,11 @@ Java_mariannelinhares_mnistandroid_MainActivity_deleteAudioRecorder(JNIEnv *env,
     if(engine.recorder_)
         delete engine.recorder_;
 
+    /* delete csv object that saves samples */
+    if(csv_log)
+        delete csv_log;
+
+    csv_log = nullptr;
     engine.recorder_ = nullptr;
 }
 

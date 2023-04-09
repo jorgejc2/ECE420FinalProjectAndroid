@@ -21,6 +21,7 @@
 #include <inttypes.h>
 
 static const char* FILE_PREFIX="/sdcard/data/audio";
+AndroidLog* csv_log = nullptr;
 
 volatile uint32_t AndroidLog::fileIdx_ = 0;
 AndroidLog::AndroidLog() : fp_(NULL), prevTick_(static_cast<uint64_t>(0)) {
@@ -56,6 +57,16 @@ void AndroidLog::log(void *buf, uint32_t size) {
     }
 }
 
+void AndroidLog::log_array(void *buf, uint32_t size, uint32_t count) {
+    Lock fileLock(&mutex_);
+    if(!buf || !size)
+        return;
+
+    if(fp_ || openFile()) {
+        fwrite(buf, size, count, fp_);
+    }
+}
+
 void AndroidLog::log(const char *fmt, ...) {
     Lock fileLock (&mutex_);
     if(!fmt) {
@@ -75,6 +86,14 @@ FILE* AndroidLog::openFile() {
     if(fp_) {
         return fp_;
     }
+
+//    /* create the directory if it does not exist */
+//    int check = mkdir(FILE_PREFIX,0777);
+//
+//    if (check) {
+//        LOGE("====failed to create directory %s", FILE_PREFIX);
+//        return fp_;
+//    }
 
     char fileName[64];
     sprintf(fileName, "%s_%d", fileName_.c_str(), AndroidLog::fileIdx_++);
@@ -104,3 +123,11 @@ uint64_t AndroidLog::getCurrentTicks() {
 
     return (static_cast<uint64_t>(1000000) * Time.tv_sec + Time.tv_usec);
 }
+
+//void debug_write_file(void* buf, uint32_t size) {
+//
+//}
+
+//void debug_write_file(void* buf) {
+//
+//}

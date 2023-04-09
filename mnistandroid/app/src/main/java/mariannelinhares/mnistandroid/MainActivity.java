@@ -36,6 +36,7 @@ import android.media.AudioRecord;
 import android.os.Bundle;
 //Object used to report movement (mouse, pen, finger, trackball) events.
 // //Motion events may hold either absolute or relative movements and other data, depending on the type of device.
+import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.view.MotionEvent;
@@ -64,10 +65,23 @@ import mariannelinhares.mnistandroid.models.TensorFlowClassifier;
 import mariannelinhares.mnistandroid.views.DrawModel;
 //class for drawing the entire app
 import mariannelinhares.mnistandroid.views.DrawView;
+// for creating directories and files from java
+import java.io.File;
+import android.os.Environment;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /* added OnRequestPerm... which i believe opens dialogue to ask for speaker permission */
 public class MainActivity extends Activity implements View.OnClickListener, View.OnTouchListener,
         ActivityCompat.OnRequestPermissionsResultCallback {
+//public class MainActivity extends Activity implements View.OnClickListener, View.OnTouchListener {
 
     private static final int PIXEL_WIDTH = 28;
 
@@ -84,8 +98,12 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     // Static Values from Lab 5
     private static final int AUDIO_ECHO_REQUEST = 0;
+    private static final int EXTERNAL_STORAGE_REQUEST = 0;
     private static final int FRAME_SIZE = 1024;
     private static final int MIN_FREQ = 50;
+
+    private float[] audio_samples;
+    private Timer timer = new Timer();
 
     /**********************************************************************************************/
 
@@ -102,6 +120,9 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     private float mLastX;
     private float mLastY;
+
+    private static final String FILENAME = "data.txt";
+    private static final String DNAME = "/sdcard/data/audio/"; //  "myfiles";
 
     @Override
     // In the onCreate() method, you perform basic application startup logic that should happen
@@ -124,7 +145,11 @@ public class MainActivity extends Activity implements View.OnClickListener, View
             // Native Setting: 48k Hz Sampling Frequency and 128 Frame Size
             createSLEngine(Integer.parseInt(nativeSampleRate), FRAME_SIZE);
         }
-    /**********************************************************************************************/
+
+        /* should be able to hold 3 seconds worth of data */
+        audio_samples = new float[48000 * 3];
+
+        /**********************************************************************************************/
 
         //get drawing view from XML (where the finger writes the number)
         drawView = (DrawView) findViewById(R.id.draw);
@@ -334,11 +359,37 @@ public class MainActivity extends Activity implements View.OnClickListener, View
             }
             startPlay();   // this must include startRecording()
             statusView.setText(getString(R.string.status_echoing));
+
+            /* start timer */
+            final Handler handler = new Handler();
+            TimerTask doAsynchronousTask = new TimerTask() {
+                @Override
+                public void run() {
+                    handler.post(new Runnable() {
+                        public void run() {
+                            try {
+                                /* need to fix this but will be a function that writes to buffer, and timer task should stop
+                                once buffer is filled all the way ( 3 second buffer )
+                                 */
+                                UpdateStftTask performStftUiUpdate = new UpdateStftTask();
+                                performStftUiUpdate.execute();
+                            } catch (Exception e) {
+                                // TODO Auto-generated catch block
+                            }
+                        }
+                    });
+                }
+            };
+            timer.schedule(doAsynchronousTask, 0, 10); // execute every 10 ms
         } else {
             stopPlay();  //this must include stopRecording()
             updateNativeAudioUI();
             deleteAudioRecorder();
             deleteSLBufferQueueAudioPlayer();
+
+            /* stop timer */
+            timer.cancel();
+
         }
         isPlaying = !isPlaying;
         controlButton.setText(getString((isPlaying == true) ?
@@ -353,9 +404,24 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                     this,
                     new String[] { Manifest.permission.RECORD_AUDIO },
                     AUDIO_ECHO_REQUEST);
-            return;
         }
         startEcho();
+
+        /* checking permissions to write to SD card and creating directory */
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                PackageManager.PERMISSION_GRANTED) {
+            statusView.setText(getString(R.string.status_record_perm));
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE },
+                    EXTERNAL_STORAGE_REQUEST);
+        }
+
+        File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, FILENAME);
+        writeTextData(rootPath, "Hello world");
+
+        return;
+
     }
 
     public void getLowLatencyParameters(View view) {
@@ -401,6 +467,11 @@ public class MainActivity extends Activity implements View.OnClickListener, View
             return;
         }
 
+        if (EXTERNAL_STORAGE_REQUEST != requestCode) {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+            return;
+        }
+
         if (grantResults.length != 1  ||
                 grantResults[0] != PackageManager.PERMISSION_GRANTED) {
             /*
@@ -427,6 +498,28 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
         // The callback runs on app's thread, so we are safe to resume the action
         startEcho();
+
+        File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, FILENAME);
+        writeTextData(rootPath, "Hello world");
+    }
+
+    private void writeTextData(File file, String data) {
+        FileOutputStream fileOutputStream = null;
+        try {
+            fileOutputStream = new FileOutputStream(file);
+            fileOutputStream.write(data.getBytes());
+            Toast.makeText(this, "Done writing to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (fileOutputStream != null) {
+                try {
+                    fileOutputStream.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     /*

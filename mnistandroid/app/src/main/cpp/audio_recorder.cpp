@@ -17,6 +17,7 @@
 #include <cstring>
 #include <cstdlib>
 #include "audio_recorder.h"
+
 /*
  * bqRecorderCallback(): called for every buffer is full;
  *                       pass directly to handler
@@ -35,8 +36,21 @@ void AudioRecorder::ProcessSLCallback(SLAndroidSimpleBufferQueueItf bq) {
     devShadowQueue_->pop();
     dataBuf->size_ = dataBuf->cap_;           //device only calls us when it is really full
 
+    /**********************************************************************************************/
+    /** NOTICE THAT THIS IS THE METHOD THAT CALLS PROCESS FRAME                                  **/
     // Call ece420 methods to modify dataBuf contents before push to play
     ece420ProcessFrame(dataBuf);
+
+    /* trying to write to file on sd card */
+//    debug_write_file(dataBuf, dataBuf->size_);
+//    debug_write_file(dataBuf);
+    if (csv_log != nullptr) {
+        csv_log->log_array(dataBuf->buf_, dataBuf->size_, dataBuf->cap_);
+    }
+
+
+
+    /**********************************************************************************************/
 
     recQueue_->push(dataBuf);
 

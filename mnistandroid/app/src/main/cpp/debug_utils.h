@@ -19,7 +19,6 @@
 #include <mutex>
 #include <string>
 
-
 /*
  * debug_write_file()
  *  Write given data to a file as binary file. File name is
@@ -44,6 +43,7 @@ public:
     AndroidLog(std::string &fileName);
     ~AndroidLog();
     void log(void* buf, uint32_t size);
+    void log_array(void* buf, uint32_t size, uint32_t count);
     void log(const char* fmt, ...);
     void logTime();
     void flush();
@@ -57,6 +57,11 @@ private:
     std::string  fileName_;
 };
 
-void debug_write_file(void* buf, uint32_t size);
+/* android log object for printing csv files to the SD card */
+extern AndroidLog* csv_log;
 
+//void debug_write_file(void* buf, uint32_t size);
+
+/* should most likely take a sample_buf pointer object */
+//void debug_write_file(void* buf);
 #endif //NATIVE_AUDIO_DEBUG_UTILS_H
