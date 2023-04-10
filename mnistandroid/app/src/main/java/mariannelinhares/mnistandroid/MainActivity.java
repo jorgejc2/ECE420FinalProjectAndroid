@@ -28,11 +28,14 @@ import android.app.Activity;
 //PointF holds two float coordinates
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.graphics.PointF;
 //A mapping from String keys to various Parcelable values (interface for data container values, parcels)
+import android.graphics.Rect;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioRecord;
+import android.os.AsyncTask;
 import android.os.Bundle;
 //Object used to report movement (mouse, pen, finger, trackball) events.
 // //Motion events may hold either absolute or relative movements and other data, depending on the type of device.
@@ -103,7 +106,10 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     private static final int MIN_FREQ = 50;
 
     private float[] audio_samples;
-    private Timer timer = new Timer();
+    private int audio_samples_idx = 0;
+    private Timer timer;
+    private int recording_duration = 0; // duration of recording in ms, should end at 30,000 ms
+
 
     /**********************************************************************************************/
 
@@ -148,6 +154,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
         /* should be able to hold 3 seconds worth of data */
         audio_samples = new float[48000 * 3];
+        timer = new Timer();
 
         /**********************************************************************************************/
 
@@ -388,12 +395,66 @@ public class MainActivity extends Activity implements View.OnClickListener, View
             deleteSLBufferQueueAudioPlayer();
 
             /* stop timer */
-            timer.cancel();
+//            timer.cancel();
+//            recording_duration = 0; // reset back to 0 ms
+//            audio_samples_idx = 0;
+
 
         }
         isPlaying = !isPlaying;
         controlButton.setText(getString((isPlaying == true) ?
                 R.string.StopEcho: R.string.StartEcho));
+    }
+
+    private class UpdateStftTask extends AsyncTask<Void, FloatBuffer, Void> {
+        @Override
+        protected Void doInBackground(Void... params) {
+
+            // Float == 4 bytes
+            // Note: We're using FloatBuffer instead of float array because interfacing with JNI
+            // with a FloatBuffer allows direct memory sharing, versus having to copy to some
+            // intermediate location first.
+            // http://stackoverflow.com/questions/10697161/why-floatbuffer-instead-of-float
+
+            /* multiply by 2 because for 50% overlap, we will now publish two FFT's per call */
+            FloatBuffer buffer = ByteBuffer.allocateDirect(FRAME_SIZE * 4)
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .asFloatBuffer();
+
+            getSamplesBuffer(buffer);
+
+            // Update screen, needs to be done on UI thread
+            publishProgress(buffer);
+
+            return null;
+        }
+
+        protected void onProgressUpdate(FloatBuffer... newBufferSamples) {
+
+            int newBufferCapacity = newBufferSamples[0].capacity();
+            for (int i = 0; i < newBufferCapacity; i++) {
+                if (audio_samples_idx + i >= audio_samples.length)
+                    break;
+                audio_samples[audio_samples_idx + i] = newBufferSamples[0].get();
+            }
+            audio_samples_idx += newBufferCapacity;
+            recording_duration += 10; // this should presumably take 10 ms
+
+            /* check if we are past 3 seconds of recording */
+            if (recording_duration >= 30000) {
+                /* make sure asynnchronous task is stopped */
+                timer.cancel();
+                recording_duration = 0; // reset back to 0 ms
+                audio_samples_idx = 0;
+
+                /* write 3 second array of samples to a csv file */
+                File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, "test_samples.csv");
+                writeSamplesToCSV(rootPath);
+
+            }
+
+            newBufferSamples[0].rewind();
+        }
     }
 
     public void onEchoClick(View view) {
@@ -419,7 +480,6 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
         File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, FILENAME);
         writeTextData(rootPath, "Hello world");
-
         return;
 
     }
@@ -522,6 +582,27 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         }
     }
 
+    private void writeSamplesToCSV(File file) {
+        FileOutputStream fileOutputStream = null;
+        try {
+            fileOutputStream = new FileOutputStream(file);
+            for (int i = 0; i < audio_samples.length; i++) {
+                fileOutputStream.write(String.format("%f\n", audio_samples[i]).getBytes());
+            }
+            Toast.makeText(this, "Done writing to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (fileOutputStream != null) {
+                try {
+                    fileOutputStream.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
     /*
      * Loading our Libs
      */
@@ -544,4 +625,5 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     public static native void stopPlay();
 
     public static native void writeNewFreq(int freq);
+    public static native void getSamplesBuffer(FloatBuffer buffer);
 }

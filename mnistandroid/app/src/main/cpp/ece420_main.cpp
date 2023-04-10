@@ -11,7 +11,9 @@
 // JNI Function
 extern "C" {
 JNIEXPORT void JNICALL
-Java_mariannelinhares_mnistandroid_MainActivity_writeNewFreq(JNIEnv *env, jclass, jint);
+    Java_mariannelinhares_mnistandroid_MainActivity_writeNewFreq(JNIEnv *env, jclass, jint);
+JNIEXPORT void JNICALL
+    Java_mariannelinhares_mnistandroid_MainActivity_getSamplesBuffer(JNIEnv *env, jclass, jobject bufferPtr);
 }
 
 // Student Variables
@@ -28,6 +30,8 @@ int newEpochIdx = FRAME_SIZE;
 // processing a frame. Thread synchronization, etc. Setting to 300 is only an initializer.
 int FREQ_NEW_ANDROID = 300;
 int FREQ_NEW = 300;
+bool isWritingSamples = false; // to protect thread that waits for samples to be written
+float rawSamples[FRAME_SIZE] = {}; // holds raw samples to be copied over to front end
 
 bool lab5PitchShift(float *bufferIn_temp) {
     // Lab 4 code is condensed into this function
@@ -155,6 +159,17 @@ void ece420ProcessFrame(sample_buf *dataBuf) {
     for (int i = 0; i < FRAME_SIZE; i++) {
         bufferOut[i + 2 * FRAME_SIZE - 1] = 0;
     }
+    /* for our purposes, we need to save the samples to the front end */
+
+    // thread-safe
+    isWritingSamples = true;
+    // Currently set everything to 0 or 1 so the spectrogram will just be blue and red stripped
+
+    for (int i = 0; i < FRAME_SIZE; i++) {
+        rawSamples[i] = data[i];
+    }
+
+    isWritingSamples = false;
 
     gettimeofday(&end, NULL);
     LOGD("Time delay: %ld us",  ((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)));
@@ -288,5 +303,18 @@ void overlapAddArray(float *dest, float *src, int startIdx, int len) {
 JNIEXPORT void JNICALL
 Java_mariannelinhares_mnistandroid_MainActivity_writeNewFreq(JNIEnv *env, jclass, jint newFreq) {
     FREQ_NEW_ANDROID = (int) newFreq;
+    return;
+}
+
+JNIEXPORT void JNICALL
+Java_mariannelinhares_mnistandroid_MainActivity_getSamplesBuffer(JNIEnv *env, jclass, jobject bufferPtr) {
+    // TODO: implement getSamplesBuffer()
+    jfloat *buffer = (jfloat *) env->GetDirectBufferAddress(bufferPtr);
+    // thread-safe, kinda
+    while (isWritingSamples) {}
+    // We will only fetch up to FRAME_SIZE data in fftOut[] to draw on to the screen
+    for (int i = 0; i < FRAME_SIZE; i++) {
+        buffer[i] = rawSamples[i];
+    }
     return;
 }
