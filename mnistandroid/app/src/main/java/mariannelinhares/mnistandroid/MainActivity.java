@@ -392,9 +392,18 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                 public void onTick(long millisUntilFinished) {
                     // logic to set the EditText could go here
                     // do nothing
+                    controlButton.setText("" + (1 + (millisUntilFinished / 1000 )));
                 }
 
                 public void onFinish() {
+                    isPlaying = false;
+                    controlButton.setText(getString(R.string.StopEcho));
+
+                    stopPlay();  //this must include stopRecording()
+                    updateNativeAudioUI();
+                    deleteAudioRecorder();
+                    deleteSLBufferQueueAudioPlayer();
+
                     /* float is 4 bytes, 48000*3 total samples for 3 seconds of audio */
                     FloatBuffer buffer = ByteBuffer.allocateDirect(48000 * 3 * 4)
                             .order(ByteOrder.LITTLE_ENDIAN)
@@ -411,6 +420,8 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                     File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, "test_samples.csv");
                     writeSamplesToCSVFromBuf(rootPath, buffer);
 
+                    /* reset parameters for the 3 second buffer in the C++ end */
+                    resetParameters();
                 }
 
             }.start();
@@ -504,8 +515,8 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                     EXTERNAL_STORAGE_REQUEST);
         }
 
-        File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, FILENAME);
-        writeTextData(rootPath, "Hello world");
+//        File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, FILENAME);
+//        writeTextData(rootPath, "Hello world");
         return;
 
     }
