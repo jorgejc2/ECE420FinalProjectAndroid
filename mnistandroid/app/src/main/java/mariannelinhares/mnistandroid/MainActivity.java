@@ -80,6 +80,9 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.Timer;
 import android.os.CountDownTimer;
+import java.util.Calendar;
+import java.util.Date;
+
 /* added OnRequestPerm... which i believe opens dialogue to ask for speaker permission */
 public class MainActivity extends Activity implements View.OnClickListener, View.OnTouchListener,
         ActivityCompat.OnRequestPermissionsResultCallback {
@@ -397,7 +400,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
                 public void onFinish() {
                     isPlaying = false;
-                    controlButton.setText(getString(R.string.StopEcho));
+                    controlButton.setText(getString(R.string.StartEcho));
 
                     stopPlay();  //this must include stopRecording()
                     updateNativeAudioUI();
@@ -417,7 +420,8 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                         audio_samples[i] = buffer.get();
                     buffer.rewind();
 
-                    File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, "test_samples.csv");
+                    Date currentTime = Calendar.getInstance().getTime();
+                    File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + ".csv");
                     writeSamplesToCSVFromBuf(rootPath, buffer);
 
                     /* reset parameters for the 3 second buffer in the C++ end */
