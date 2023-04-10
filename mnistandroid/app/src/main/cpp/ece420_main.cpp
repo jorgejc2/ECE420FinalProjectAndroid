@@ -13,7 +13,10 @@ extern "C" {
 JNIEXPORT void JNICALL
     Java_mariannelinhares_mnistandroid_MainActivity_writeNewFreq(JNIEnv *env, jclass, jint);
 JNIEXPORT void JNICALL
-    Java_mariannelinhares_mnistandroid_MainActivity_getSamplesBuffer(JNIEnv *env, jclass, jobject bufferPtr);
+Java_mariannelinhares_mnistandroid_MainActivity_getCompleteSamplesBuffer(JNIEnv *env, jclass clazz,
+                                                                         jobject bufferPtr);
+JNIEXPORT void JNICALL
+Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jclass clazz);
 }
 
 // Student Variables
@@ -32,6 +35,11 @@ int FREQ_NEW_ANDROID = 300;
 int FREQ_NEW = 300;
 bool isWritingSamples = false; // to protect thread that waits for samples to be written
 float rawSamples[FRAME_SIZE] = {}; // holds raw samples to be copied over to front end
+
+const int threeSecondSampleSize = F_S * 3;
+int threeSecondSamples_idx = 0;
+float threeSecondSamples[threeSecondSampleSize] = {};
+
 
 bool lab5PitchShift(float *bufferIn_temp) {
     // Lab 4 code is condensed into this function
@@ -161,15 +169,13 @@ void ece420ProcessFrame(sample_buf *dataBuf) {
     }
     /* for our purposes, we need to save the samples to the front end */
 
-    // thread-safe
-    isWritingSamples = true;
-    // Currently set everything to 0 or 1 so the spectrogram will just be blue and red stripped
-
     for (int i = 0; i < FRAME_SIZE; i++) {
-        rawSamples[i] = data[i];
+        if (threeSecondSamples_idx + i >= threeSecondSampleSize)
+            break;
+        threeSecondSamples[threeSecondSamples_idx + i] = data[i];
     }
-
-    isWritingSamples = false;
+    if (threeSecondSamples_idx < threeSecondSampleSize)
+        threeSecondSamples_idx += FRAME_SIZE;
 
     gettimeofday(&end, NULL);
     LOGD("Time delay: %ld us",  ((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)));
@@ -307,14 +313,19 @@ Java_mariannelinhares_mnistandroid_MainActivity_writeNewFreq(JNIEnv *env, jclass
 }
 
 JNIEXPORT void JNICALL
-Java_mariannelinhares_mnistandroid_MainActivity_getSamplesBuffer(JNIEnv *env, jclass, jobject bufferPtr) {
-    // TODO: implement getSamplesBuffer()
+Java_mariannelinhares_mnistandroid_MainActivity_getCompleteSamplesBuffer(JNIEnv *env, jclass clazz,
+                                                                         jobject bufferPtr) {
+    // TODO: implement getCompleteSamplesBuffer()
     jfloat *buffer = (jfloat *) env->GetDirectBufferAddress(bufferPtr);
     // thread-safe, kinda
-    while (isWritingSamples) {}
-    // We will only fetch up to FRAME_SIZE data in fftOut[] to draw on to the screen
-    for (int i = 0; i < FRAME_SIZE; i++) {
-        buffer[i] = rawSamples[i];
-    }
+    for (int i = 0; i < threeSecondSampleSize; i++)
+        buffer[i] = threeSecondSamples[i];
+
     return;
+}
+
+JNIEXPORT void JNICALL
+Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jclass clazz) {
+    // TODO: implement resetParameters()
+    threeSecondSamples_idx = 0;
 }

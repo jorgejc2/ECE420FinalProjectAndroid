@@ -79,8 +79,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.Timer;
-import java.util.TimerTask;
-
+import android.os.CountDownTimer;
 /* added OnRequestPerm... which i believe opens dialogue to ask for speaker permission */
 public class MainActivity extends Activity implements View.OnClickListener, View.OnTouchListener,
         ActivityCompat.OnRequestPermissionsResultCallback {
@@ -109,7 +108,6 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     private int audio_samples_idx = 0;
     private Timer timer;
     private int recording_duration = 0; // duration of recording in ms, should end at 30,000 ms
-
 
     /**********************************************************************************************/
 
@@ -368,94 +366,122 @@ public class MainActivity extends Activity implements View.OnClickListener, View
             statusView.setText(getString(R.string.status_echoing));
 
             /* start timer */
-            final Handler handler = new Handler();
-            TimerTask doAsynchronousTask = new TimerTask() {
-                @Override
-                public void run() {
-                    handler.post(new Runnable() {
-                        public void run() {
-                            try {
-                                /* need to fix this but will be a function that writes to buffer, and timer task should stop
-                                once buffer is filled all the way ( 3 second buffer )
-                                 */
-                                UpdateStftTask performStftUiUpdate = new UpdateStftTask();
-                                performStftUiUpdate.execute();
-                            } catch (Exception e) {
-                                // TODO Auto-generated catch block
-                            }
-                        }
-                    });
+//            final Handler handler = new Handler();
+//            TimerTask doAsynchronousTask = new TimerTask() {
+//                @Override
+//                public void run() {
+//                    handler.post(new Runnable() {
+//                        public void run() {
+//                            try {
+//                                /* need to fix this but will be a function that writes to buffer, and timer task should stop
+//                                once buffer is filled all the way ( 3 second buffer )
+//                                 */
+//                                UpdateStftTask performStftUiUpdate = new UpdateStftTask();
+//                                performStftUiUpdate.execute();
+//                            } catch (Exception e) {
+//                                // TODO Auto-generated catch block
+//                            }
+//                        }
+//                    });
+//                }
+//            };
+//            timer.schedule(doAsynchronousTask, 0, 10); // execute every 10 ms
+            /* count down timer implementation */
+            new CountDownTimer(3000, 1000) {
+
+                public void onTick(long millisUntilFinished) {
+                    // logic to set the EditText could go here
+                    // do nothing
                 }
-            };
-            timer.schedule(doAsynchronousTask, 0, 10); // execute every 10 ms
+
+                public void onFinish() {
+                    /* float is 4 bytes, 48000*3 total samples for 3 seconds of audio */
+                    FloatBuffer buffer = ByteBuffer.allocateDirect(48000 * 3 * 4)
+                            .order(ByteOrder.LITTLE_ENDIAN)
+                            .asFloatBuffer();
+
+                    /* get the three seconds worth of data from the C++ end */
+                    getCompleteSamplesBuffer(buffer);
+
+                    /* save the samples to the global float buffer */
+                    for (int i = 0; i < 48000 * 3; i++)
+                        audio_samples[i] = buffer.get();
+                    buffer.rewind();
+
+                    File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, "test_samples.csv");
+                    writeSamplesToCSVFromBuf(rootPath, buffer);
+
+                }
+
+            }.start();
         } else {
             stopPlay();  //this must include stopRecording()
             updateNativeAudioUI();
             deleteAudioRecorder();
             deleteSLBufferQueueAudioPlayer();
 
-            /* stop timer */
-//            timer.cancel();
-//            recording_duration = 0; // reset back to 0 ms
-//            audio_samples_idx = 0;
-
-
+            /* reset parameters for the 3 second buffer in the C++ end */
+            resetParameters();
         }
         isPlaying = !isPlaying;
         controlButton.setText(getString((isPlaying == true) ?
                 R.string.StopEcho: R.string.StartEcho));
     }
 
-    private class UpdateStftTask extends AsyncTask<Void, FloatBuffer, Void> {
-        @Override
-        protected Void doInBackground(Void... params) {
-
-            // Float == 4 bytes
-            // Note: We're using FloatBuffer instead of float array because interfacing with JNI
-            // with a FloatBuffer allows direct memory sharing, versus having to copy to some
-            // intermediate location first.
-            // http://stackoverflow.com/questions/10697161/why-floatbuffer-instead-of-float
-
-            /* multiply by 2 because for 50% overlap, we will now publish two FFT's per call */
-            FloatBuffer buffer = ByteBuffer.allocateDirect(FRAME_SIZE * 4)
-                    .order(ByteOrder.LITTLE_ENDIAN)
-                    .asFloatBuffer();
-
-            getSamplesBuffer(buffer);
-
-            // Update screen, needs to be done on UI thread
-            publishProgress(buffer);
-
-            return null;
-        }
-
-        protected void onProgressUpdate(FloatBuffer... newBufferSamples) {
-
-            int newBufferCapacity = newBufferSamples[0].capacity();
-            for (int i = 0; i < newBufferCapacity; i++) {
-                if (audio_samples_idx + i >= audio_samples.length)
-                    break;
-                audio_samples[audio_samples_idx + i] = newBufferSamples[0].get();
-            }
-            audio_samples_idx += newBufferCapacity;
-            recording_duration += 10; // this should presumably take 10 ms
-
-            /* check if we are past 3 seconds of recording */
-            if (recording_duration >= 30000) {
-                /* make sure asynnchronous task is stopped */
-                timer.cancel();
-                recording_duration = 0; // reset back to 0 ms
-                audio_samples_idx = 0;
-
-                /* write 3 second array of samples to a csv file */
-                File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, "test_samples.csv");
-                writeSamplesToCSV(rootPath);
-
-            }
-
-            newBufferSamples[0].rewind();
-        }
-    }
+    /*
+     * Not a good method for capturing clean audio data, but a good example of how to run a
+     * periodic thread
+     */
+//    private class UpdateStftTask extends AsyncTask<Void, FloatBuffer, Void> {
+//        @Override
+//        protected Void doInBackground(Void... params) {
+//
+//            // Float == 4 bytes
+//            // Note: We're using FloatBuffer instead of float array because interfacing with JNI
+//            // with a FloatBuffer allows direct memory sharing, versus having to copy to some
+//            // intermediate location first.
+//            // http://stackoverflow.com/questions/10697161/why-floatbuffer-instead-of-float
+//
+//            /* multiply by 2 because for 50% overlap, we will now publish two FFT's per call */
+//            FloatBuffer buffer = ByteBuffer.allocateDirect(FRAME_SIZE * 4)
+//                    .order(ByteOrder.LITTLE_ENDIAN)
+//                    .asFloatBuffer();
+//
+//            getSamplesBuffer(buffer);
+//
+//            // Update screen, needs to be done on UI thread
+//            publishProgress(buffer);
+//
+//            return null;
+//        }
+//
+//        protected void onProgressUpdate(FloatBuffer... newBufferSamples) {
+//
+//            int newBufferCapacity = newBufferSamples[0].capacity();
+//            for (int i = 0; i < newBufferCapacity; i++) {
+//                if (audio_samples_idx + i >= audio_samples.length)
+//                    break;
+//                audio_samples[audio_samples_idx + i] = newBufferSamples[0].get();
+//            }
+//            audio_samples_idx += newBufferCapacity;
+//            recording_duration += 10; // this should presumably take 10 ms
+//
+//            /* check if we are past 3 seconds of recording */
+//            if (recording_duration >= 30000) {
+//                /* make sure asynnchronous task is stopped */
+//                timer.cancel();
+//                recording_duration = 0; // reset back to 0 ms
+//                audio_samples_idx = 0;
+//
+//                /* write 3 second array of samples to a csv file */
+//                File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, "test_samples.csv");
+//                writeSamplesToCSV(rootPath);
+//
+//            }
+//
+//            newBufferSamples[0].rewind();
+//        }
+//    }
 
     public void onEchoClick(View view) {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) !=
@@ -582,12 +608,12 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         }
     }
 
-    private void writeSamplesToCSV(File file) {
+    private void writeSamplesToCSVFromBuf(File file, FloatBuffer buff) {
         FileOutputStream fileOutputStream = null;
         try {
             fileOutputStream = new FileOutputStream(file);
-            for (int i = 0; i < audio_samples.length; i++) {
-                fileOutputStream.write(String.format("%f\n", audio_samples[i]).getBytes());
+            for (int i = 0; i < 48000 * 3; i++) {
+                fileOutputStream.write(String.format("%f\n", buff.get()).getBytes());
             }
             Toast.makeText(this, "Done writing to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
@@ -625,5 +651,6 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     public static native void stopPlay();
 
     public static native void writeNewFreq(int freq);
-    public static native void getSamplesBuffer(FloatBuffer buffer);
+    public static native void getCompleteSamplesBuffer(FloatBuffer bufferPtr);
+    public static native void resetParameters();
 }
