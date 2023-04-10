@@ -668,4 +668,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     public static native void writeNewFreq(int freq);
     public static native void getCompleteSamplesBuffer(FloatBuffer bufferPtr);
     public static native void resetParameters();
+
+    /* function for doing mfcc */
+    public static native void performMFCC(FloatBuffer bufferPtr);
 }

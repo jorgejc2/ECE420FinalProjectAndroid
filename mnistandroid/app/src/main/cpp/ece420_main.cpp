@@ -17,6 +17,10 @@ Java_mariannelinhares_mnistandroid_MainActivity_getCompleteSamplesBuffer(JNIEnv 
                                                                          jobject bufferPtr);
 JNIEXPORT void JNICALL
 Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jclass clazz);
+
+JNIEXPORT void JNICALL
+Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz,
+        jobject bufferPtr);
 }
 
 // Student Variables
@@ -39,6 +43,21 @@ float rawSamples[FRAME_SIZE] = {}; // holds raw samples to be copied over to fro
 const int threeSecondSampleSize = F_S * 3;
 int threeSecondSamples_idx = 0;
 float threeSecondSamples[threeSecondSampleSize] = {};
+
+/* processing parameters */
+const int fs = 48000; // sampling rate (pre down sampling)
+const int down_sampled_fs = 8000; // sampling rate (after down sampling)
+const int nfft = 256; // size of fft frames
+const int noverlap = -1; // -1 means to use the default overlap of 50%
+const int nfilt = 40; // number of filter banks to create
+const int num_ceps = 13; // number of cepstral coefficients to output
+const int nn_data_cols = 48; // number of frames to work with
+const int nn_data_rows = 12; // is always num_ceps - 1
+
+/* Hanning Window */
+float hanning_window[nfft] = {};
+bool hanning_window_initialized = false;
+float window_scaling_factor = 0;
 
 
 bool lab5PitchShift(float *bufferIn_temp) {
@@ -305,6 +324,92 @@ void overlapAddArray(float *dest, float *src, int startIdx, int len) {
     }
 }
 
+/* MFCC algorithms */
+void preemphasis(float* samples, int num_samples, float b) {
+
+    float prev_sample = 0.0;
+
+    for (int i = 0; i < num_samples; i++) {
+        samples[i] = samples[i] - b*prev_sample;
+        prev_sample = samples[i];
+    }
+
+    return;
+}
+
+void applyHanning(float* frame) {
+    /* initialize the global hanning window array if it has not already */
+    if (!hanning_window_initialized) {
+        window_scaling_factor = 0;
+        for (int n = 0; n < nfft; n++) {
+            hanning_window[n] = (0.5 * (1 - cos(2*(1.0*n/(nfft-1)))));
+            window_scaling_factor += hanning_window[n] * hanning_window[n];
+        }
+    }
+
+    /* apply the hanning winow to the frame */
+    for (int i = 0; i < nfft; i++)
+        frame[i] *= hanning_window[i];
+
+    return;
+}
+
+void performSTFT(float *samples, float* frequencies, int num_samples, int noverlap, int sample_rate, bool oneSided){
+
+    if (noverlap < 0)
+        noverlap = nfft / 2;
+
+    /* Determine how many FFT's need to be computed */
+    int step = nfft - noverlap;
+    int num_ffts = ceil((float)num_samples/step);
+
+    /* trim FFT's that are out of bounds */
+    while ( (num_ffts - 1)*step + (nfft - 1) >= num_samples)
+        num_ffts--;
+
+    // Apply fft with KISS_FFT engine
+    kiss_fft_cfg cfg = kiss_fft_alloc(nfft, 0, NULL, NULL);
+    kiss_fft_cpx in[nfft];
+    kiss_fft_cpx out[nfft];
+
+    /* applying fft for all frames */
+    std::vector<std::vector<float>> stft_result(int(nfft/2 + 1), std::vector<float>(num_ffts, 0));
+    for (int n = 0; n < num_ffts; n++) {
+
+        /* apply hanning window */
+        applyHanning(&samples[n * step]);
+
+        /* copy over frame into kiss_fft buffer */
+        for (int i = 0; i < nfft; i++) {
+            in[i].r = samples[n * step + i];
+            in[i].i = 0;
+        }
+
+        /* conduct the fft */
+        kiss_fft(cfg, in, out);
+
+        /* convert output to decibals and store result */
+        if (oneSided) {
+            for (int i = 0; i < int(nfft/2 + 1); i++)
+                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
+        }
+        else {
+            for (int i = 0; i < nfft; i++)
+                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
+        }
+    }
+    kiss_fft_free(cfg);
+
+    /* apply the filter banks */
+
+    /* apply the dct */
+
+
+    /* return final output */
+    
+    return;
+}
+
 
 JNIEXPORT void JNICALL
 Java_mariannelinhares_mnistandroid_MainActivity_writeNewFreq(JNIEnv *env, jclass, jint newFreq) {
@@ -328,4 +433,13 @@ JNIEXPORT void JNICALL
 Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jclass clazz) {
     // TODO: implement resetParameters()
     threeSecondSamples_idx = 0;
+}
+
+JNIEXPORT void JNICALL
+Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz,
+                                                            jobject bufferPtr) {
+    // TODO: implement performMFCC()
+    jfloat *buffer = (jfloat *) env->GetDirectBufferAddress(bufferPtr);
+
+
 }
