@@ -7,6 +7,7 @@
 #include "ece420_main.h"
 #include "ece420_lib.h"
 #include "kiss_fft/kiss_fft.h"
+#include "mfcc_tools.h"
 
 // JNI Function
 extern "C" {
@@ -406,7 +407,7 @@ void performSTFT(float *samples, float* frequencies, int num_samples, int noverl
 
 
     /* return final output */
-    
+
     return;
 }
 
@@ -439,7 +440,7 @@ JNIEXPORT void JNICALL
 Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz,
                                                             jobject bufferPtr) {
     // TODO: implement performMFCC()
-    jfloat *buffer = (jfloat *) env->GetDirectBufferAddress(bufferPtr);
+//    jfloat *buffer = (jfloat *) env->GetDirectBufferAddress(bufferPtr);
 
 
 }
