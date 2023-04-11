@@ -6,10 +6,29 @@
 
 using namespace std;
 
+#define N_TAPS 51
+const float fir_coefficients [N_TAPS] = {-0.01141003352268849, -0.013262878999151668, -0.012421570191556987, -0.008824561658407391, -0.0029776637056192915, 0.004098971913804342, 0.011030338450131785, 0.016329730040982957, 0.018685369327607042, 0.017239493231304706, 0.011806989763287312, 0.002988485010502018, -0.007850704665670786, -0.018741751293484914, -0.02739481121155779, -0.03156139343863706, -0.029418861185771146, -0.01991252167772265, -0.002994989095316821, 0.020282611087152663, 0.047849778038868376, 0.07686050260107538, 0.10406863704643883, 0.12627886838288652, 0.14080366814266507, 0.1458543018661343, 0.14080366814266507, 0.12627886838288652, 0.10406863704643883, 0.07686050260107538, 0.047849778038868376, 0.020282611087152663, -0.002994989095316821, -0.01991252167772265, -0.029418861185771146, -0.03156139343863706, -0.02739481121155779, -0.018741751293484914, -0.007850704665670786, 0.002988485010502018, 0.011806989763287312, 0.017239493231304706, 0.018685369327607042, 0.016329730040982957, 0.011030338450131785, 0.004098971913804342, -0.0029776637056192915, -0.008824561658407391, -0.012421570191556987, -0.013262878999151668, -0.01141003352268849};
+// Circular Buffer
+float circBuf[N_TAPS] = {};
+int circBufIdx = 0;
+
 namespace mfcc {
 
+    /* MFCC algorithms */
+    void preemphasis(float* samples, int num_samples, float b) {
+
+        float prev_sample = 0.0;
+
+        for (int i = 0; i < num_samples; i++) {
+            samples[i] = samples[i] - b*prev_sample;
+            prev_sample = samples[i];
+        }
+
+        return;
+    }
+
     /*
-     * 
+     * Description
      */
     int getMelFilterBanks (float** MelFilterArray, int nfft, int numFilters, int frameSize, int sampleRate) {
 
@@ -124,5 +143,68 @@ namespace mfcc {
         #undef out_
     };
 
+    int downsample(float* samples, float** new_samples, int num_samples, int original_sampling_rate, int new_sampling_rate) {
+
+        /* calculate the factor by which we have to down sample based on the original and new sampling rate */
+        int down_sampling_factor = original_sampling_rate / new_sampling_rate;
+        int new_samples_size = num_samples / down_sampling_factor;
+        float* new_samples_ = new float[new_samples_size];
+
+        /* down sample */
+        for (int i = 0; i < num_samples; i+=down_sampling_factor) {
+            new_samples_[i / down_sampling_factor] = samples[i];
+        }
+
+        /* return newly downsampled array */
+        *new_samples = new_samples_;
+
+        /* return size of newly downsamples array */
+        return new_samples_size;
+    }
+
+    void applyFirFilter(float* samples, int num_samples) {
+        for (int i = 0; i < num_samples; i++) {
+            samples[i] = firFilter(samples[i]);
+        }
+        resetFirCircBuf();
+
+        return;
+    }
+
+    // FirFilter Function
+    float firFilter(float sample) {
+        // This function simulates sample-by-sample processing. Here you will
+        // implement an FIR filter such as:
+        //
+        // y[n] = a x[n] + b x[n-1] + c x[n-2] + ...
+        //
+        // You will maintain a circular buffer to store your prior samples
+        // x[n-1], x[n-2], ..., x[n-k]. Suggested initializations circBuf
+        // and circBufIdx are given.
+        //
+        // Input 'sample' is the current sample x[n].
+        // ******************** START YOUR CODE HERE ******************** //
+        float output;
+        double inter = 0.0; // to preserve accuracy during the calculation
+
+        /* insert sample into buffer */
+        circBuf[circBufIdx] = sample;
+
+        /* perform convolution */
+        for (int i = 0; i < N_TAPS; i++) {
+            inter += fir_coefficients[i] * circBuf[ (((circBufIdx - i) % N_TAPS) + N_TAPS) % N_TAPS];
+        }
+        output = float(inter);
+        /* update pointer */
+        circBufIdx = (circBufIdx + 1) % N_TAPS;
+        // ********************* END YOUR CODE HERE ********************* //
+        return output;
+    }
+
+    void resetFirCircBuf() {
+        circBufIdx = 0;
+        for (int i = 0; i < N_TAPS; i++)
+            circBuf[i] = 0;
+    }
 
 };

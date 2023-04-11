@@ -325,19 +325,6 @@ void overlapAddArray(float *dest, float *src, int startIdx, int len) {
     }
 }
 
-/* MFCC algorithms */
-void preemphasis(float* samples, int num_samples, float b) {
-
-    float prev_sample = 0.0;
-
-    for (int i = 0; i < num_samples; i++) {
-        samples[i] = samples[i] - b*prev_sample;
-        prev_sample = samples[i];
-    }
-
-    return;
-}
-
 void applyHanning(float* frame) {
     /* initialize the global hanning window array if it has not already */
     if (!hanning_window_initialized) {
