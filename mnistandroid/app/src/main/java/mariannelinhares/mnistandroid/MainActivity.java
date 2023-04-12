@@ -421,11 +421,23 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                     buffer.rewind();
 
                     Date currentTime = Calendar.getInstance().getTime();
-                    File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + ".csv");
+                    File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_rawsamples.csv");
                     writeSamplesToCSVFromBuf(rootPath, buffer);
 
                     /* reset parameters for the 3 second buffer in the C++ end */
                     resetParameters();
+
+                    /* get size to allocate for new buffer and perform mfcc */
+                    int [] mfcc_dim = getRowAndCol();
+                    int mfcc_rows = mfcc_dim[0];
+                    int mfcc_cols = mfcc_dim[1];
+                    float [] mfcc_output = new float[mfcc_rows * mfcc_cols];
+                    performMFCC(buffer, mfcc_output);
+
+                    currentTime = Calendar.getInstance().getTime();
+                    rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_processed.csv");
+                    writeSamplesToCSVFromArray(rootPath, mfcc_output);
+
                 }
 
             }.start();
@@ -644,6 +656,27 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         }
     }
 
+    private void writeSamplesToCSVFromArray(File file, float[] buff) {
+        FileOutputStream fileOutputStream = null;
+        try {
+            fileOutputStream = new FileOutputStream(file);
+            for (int i = 0; i < 48000 * 3; i++) {
+                fileOutputStream.write(String.format("%f\n", buff[i]).getBytes());
+            }
+            Toast.makeText(this, "Done writing to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (fileOutputStream != null) {
+                try {
+                    fileOutputStream.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
     /*
      * Loading our Libs
      */
@@ -671,4 +704,5 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     /* function for doing mfcc */
     public static native void performMFCC(FloatBuffer bufferPtr, float[] outputArray);
+    public native int[] getRowAndCol();
 }

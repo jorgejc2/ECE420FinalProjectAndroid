@@ -13,15 +13,19 @@
 extern "C" {
 JNIEXPORT void JNICALL
     Java_mariannelinhares_mnistandroid_MainActivity_writeNewFreq(JNIEnv *env, jclass, jint);
+
 JNIEXPORT void JNICALL
-Java_mariannelinhares_mnistandroid_MainActivity_getCompleteSamplesBuffer(JNIEnv *env, jclass clazz,
-                                                                         jobject bufferPtr);
+    Java_mariannelinhares_mnistandroid_MainActivity_getCompleteSamplesBuffer(JNIEnv *env, jclass clazz,
+                                                                             jobject bufferPtr);
 JNIEXPORT void JNICALL
 Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jclass clazz);
 
 JNIEXPORT void JNICALL
-Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz,
-        jobject bufferPtr, jfloatArray outputArray);
+    Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz,
+            jobject bufferPtr, jfloatArray outputArray);
+
+JNIEXPORT jintArray JNICALL
+    Java_mariannelinhares_mnistandroid_MainActivity_getRowAndCol(JNIEnv *env, jclass clazz);
 }
 
 // Student Variables
@@ -52,7 +56,8 @@ const int nfft = 256; // size of fft frames
 const int noverlap = -1; // -1 means to use the default overlap of 50%
 const int nfilt = 40; // number of filter banks to create
 const int num_ceps = 13; // number of cepstral coefficients to output
-const int nn_data_cols = 48; // number of frames to work with
+//const int nn_data_cols = 48; // number of frames to work with
+const int nn_data_cols = 1100;
 const int nn_data_rows = 12; // is always num_ceps - 1
 bool coeffecients_initialized = false;
 float* MelFilterArray = nullptr;
@@ -347,11 +352,13 @@ void applyHanning(float* frame) {
 
 int performSTFT(float *samples, float** frequencies, int num_samples, int sample_rate, bool oneSided){
 
+    int noverlap_ = noverlap;
+
     if (noverlap < 0)
-        noverlap = nfft / 2;
+        noverlap_ = nfft / 2;
 
     /* Determine how many FFT's need to be computed */
-    int step = nfft - noverlap;
+    int step = nfft - noverlap_;
     int num_ffts = ceil((float)num_samples/step);
 
     /* trim FFT's that are out of bounds */
@@ -368,14 +375,20 @@ int performSTFT(float *samples, float** frequencies, int num_samples, int sample
 
     /* applying fft for all frames */
 //    std::vector<std::vector<float>> stft_result(int(nfft/2 + 1), std::vector<float>(num_ffts, 0));
+    float curr_samples [nfft];
     for (int n = 0; n < num_ffts; n++) {
 
+        /* get the current samples we want */
+        for (int i = 0; i < nfft; i++) {
+            curr_samples[i] = samples[n * step];
+        }
+
         /* apply hanning window */
-        applyHanning(&samples[n * step]);
+        applyHanning(curr_samples);
 
         /* copy over frame into kiss_fft buffer */
         for (int i = 0; i < nfft; i++) {
-            in[i].r = samples[n * step + i];
+            in[i].r = curr_samples[i];
             in[i].i = 0;
         }
 
@@ -386,12 +399,13 @@ int performSTFT(float *samples, float** frequencies, int num_samples, int sample
         if (oneSided) {
             for (int i = 0; i < int(nfft/2 + 1); i++)
 //                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
-                frequencies_[i * num_ffts + n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
+//                frequencies_[i * num_ffts + n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
+                frequencies_[i * num_ffts + n] = (out[i].r*out[i].r + out[i].i*out[i].i);
         }
         else {
             for (int i = 0; i < nfft; i++)
 //                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
-                frequencies_[i * num_ffts + n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
+                frequencies_[i * num_ffts + n] = (out[i].r*out[i].r + out[i].i*out[i].i);
         }
     }
     kiss_fft_free(cfg);
@@ -409,12 +423,20 @@ int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, int n
     /* apply stft */
     float* stft_output = nullptr;
     int stft_output_size = performSTFT(samples, &stft_output, num_samples, sampling_rate, true);
+    int stft_num_frames = stft_output_size / (nfft / 2 + 1);
 
     /* apply the mel filter banks */
-    int mel_filtered_output_size = nfilt * num_frames;
+//    int mel_filtered_output_size = nfilt * num_frames;
+    int mel_filtered_output_size = nfilt * stft_num_frames;
     float* mel_filtered_output = new float[mel_filtered_output_size];
-    mfcc::gemmMultiplication(MelFilterArray, stft_output, mel_filtered_output, nfft / 2 + 1, num_frames);
+//    mfcc::gemmMultiplication(MelFilterArray, stft_output, mel_filtered_output, nfilt, nfft / 2 + 1, num_frames);
+    mfcc::gemmMultiplication(MelFilterArray, stft_output, mel_filtered_output, nfilt, nfft / 2 + 1, stft_num_frames);
 
+    int num_non_zeros = 0;
+    for (int i = 0; i < nfilt * (nfft / 2 + 1); i++) {
+        if (MelFilterArray[i] != 0)
+            ++num_non_zeros;
+    }
     /* stft_output no longer needed */
     delete [] stft_output;
 
@@ -424,10 +446,12 @@ int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, int n
     }
 
     /* perform DCT */
-    int ceps_output_size = num_ceps * num_frames;
+//    int ceps_output_size = num_ceps * num_frames;
+    int ceps_output_size = num_ceps * stft_num_frames;
     float* ceps_output = new float [ceps_output_size];
 
-    mfcc::gemmMultiplication(DCTArray, mel_filtered_output, ceps_output, num_ceps, nfilt, num_frames);
+//    mfcc::gemmMultiplication(DCTArray, mel_filtered_output, ceps_output, num_ceps, nfilt, num_frames);
+    mfcc::gemmMultiplication(DCTArray, mel_filtered_output, ceps_output, num_ceps, nfilt, stft_num_frames);
 
     /* no longer need mel_filterd_output array */
     delete [] mel_filtered_output;
@@ -437,8 +461,9 @@ int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, int n
     float* final_output = new float[final_output_size];
 
     for (int i = 0; i < nn_data_rows; i++) {
-        for (int j = 0; j < nn_data_cols; i++) {
-            final_output[i * nn_data_cols + j] = mel_filtered_output[i * nn_data_cols + j];
+        for (int j = 0; j < nn_data_cols; j++) {
+//            final_output[i * nn_data_cols + j] = ceps_output[i * num_frames + j];
+            final_output[i * nn_data_cols + j] = ceps_output[i * stft_num_frames + j];
         }
     }
 
@@ -497,4 +522,16 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
     delete [] final_output;
 
     return;
+};
+
+JNIEXPORT jintArray JNICALL
+Java_mariannelinhares_mnistandroid_MainActivity_getRowAndCol(JNIEnv *env, jclass clazz) {
+    jintArray result = env->NewIntArray(2);
+    if (result == nullptr) {
+        return nullptr; // Out of memory error
+    }
+
+    jint tempArray[] = {nn_data_rows, nn_data_cols};
+    env->SetIntArrayRegion(result, 0, 2, tempArray);
+    return result;
 };

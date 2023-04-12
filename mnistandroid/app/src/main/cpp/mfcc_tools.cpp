@@ -55,7 +55,8 @@ namespace mfcc {
         float hz_point;
         for (int i = 0; i < num_bins; i++) {
             mel_point = i * mel_step;
-            hz_point = 700 * ( pow(10.0, mel_point / 2595.0) - 1 );
+//            hz_point = 700 * ( pow(10.0, mel_point / 2595.0) - 1 );
+            hz_point = 700 * ( (10.0 + mel_point / 2595.0) - 1 );
             bins[i] = int( (nfft + 1) * hz_point / (sampleRate*2) );
         }
 
