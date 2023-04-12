@@ -56,8 +56,8 @@ const int nfft = 256; // size of fft frames
 const int noverlap = -1; // -1 means to use the default overlap of 50%
 const int nfilt = 40; // number of filter banks to create
 const int num_ceps = 13; // number of cepstral coefficients to output
-//const int nn_data_cols = 48; // number of frames to work with
-const int nn_data_cols = 1100;
+const int nn_data_cols = 48; // number of frames to work with
+//const int nn_data_cols = 1100;
 const int nn_data_rows = 12; // is always num_ceps - 1
 bool coeffecients_initialized = false;
 float* MelFilterArray = nullptr;
@@ -425,33 +425,44 @@ int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, int n
     int stft_output_size = performSTFT(samples, &stft_output, num_samples, sampling_rate, true);
     int stft_num_frames = stft_output_size / (nfft / 2 + 1);
 
-    /* apply the mel filter banks */
-//    int mel_filtered_output_size = nfilt * num_frames;
-    int mel_filtered_output_size = nfilt * stft_num_frames;
-    float* mel_filtered_output = new float[mel_filtered_output_size];
-//    mfcc::gemmMultiplication(MelFilterArray, stft_output, mel_filtered_output, nfilt, nfft / 2 + 1, num_frames);
-    mfcc::gemmMultiplication(MelFilterArray, stft_output, mel_filtered_output, nfilt, nfft / 2 + 1, stft_num_frames);
+    float * trimmed_stft_output = new float [(nfft / 2 + 1) * nn_data_cols];
 
-    int num_non_zeros = 0;
-    for (int i = 0; i < nfilt * (nfft / 2 + 1); i++) {
-        if (MelFilterArray[i] != 0)
-            ++num_non_zeros;
+    for (int row = 0; row < (nfft / 2 + 1); row++) {
+        for (int col = 0; col < nn_data_cols; col++) {
+            trimmed_stft_output[row * nn_data_cols + col] = stft_output[row * stft_num_frames + col];
+        }
     }
-    /* stft_output no longer needed */
     delete [] stft_output;
 
+    /* apply the mel filter banks */
+    int mel_filtered_output_size = nfilt * num_frames;
+    float* mel_filtered_output = new float[mel_filtered_output_size];
+//    mfcc::gemmMultiplication(MelFilterArray, stft_output, mel_filtered_output, nfilt, nfft / 2 + 1, num_frames);
+    mfcc::gemmMultiplication(MelFilterArray, trimmed_stft_output, mel_filtered_output, nfilt, nfft / 2 + 1, num_frames);
+
+    int numNeg = 0;
+    int numZero = 0;
+    int inf = 0;
+    int nan = 0;
     /* take log base 10 of output before applying DCT */
     for (int i = 0; i < mel_filtered_output_size; i++) {
-        mel_filtered_output[i] = log10(mel_filtered_output[i]);
+        float temp = mel_filtered_output[i];
+        if (temp == 0)
+            numZero++;
+        if (temp < 0)
+            numNeg++;
+        mel_filtered_output[i] = log10f(temp);
+        if (std::isinf(mel_filtered_output[i]))
+            inf++;
+        if (std::isnan(mel_filtered_output[i]))
+            nan++;
     }
 
     /* perform DCT */
-//    int ceps_output_size = num_ceps * num_frames;
-    int ceps_output_size = num_ceps * stft_num_frames;
+    int ceps_output_size = num_ceps * num_frames;
     float* ceps_output = new float [ceps_output_size];
 
-//    mfcc::gemmMultiplication(DCTArray, mel_filtered_output, ceps_output, num_ceps, nfilt, num_frames);
-    mfcc::gemmMultiplication(DCTArray, mel_filtered_output, ceps_output, num_ceps, nfilt, stft_num_frames);
+    mfcc::gemmMultiplication(DCTArray, mel_filtered_output, ceps_output, num_ceps, nfilt, num_frames);
 
     /* no longer need mel_filterd_output array */
     delete [] mel_filtered_output;
@@ -462,8 +473,7 @@ int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, int n
 
     for (int i = 0; i < nn_data_rows; i++) {
         for (int j = 0; j < nn_data_cols; j++) {
-//            final_output[i * nn_data_cols + j] = ceps_output[i * num_frames + j];
-            final_output[i * nn_data_cols + j] = ceps_output[i * stft_num_frames + j];
+            final_output[i * nn_data_cols + j] = ceps_output[i * num_frames + j];
         }
     }
 
@@ -506,7 +516,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
 
     /* Initialize DCT and MelFilter arrays if not initialized */
     if (!coeffecients_initialized) {
-        mfcc::getMelFilterBanks(&MelFilterArray, nfft, nfilt, nn_data_cols, fs);
+        mfcc::getMelFilterBanks(&MelFilterArray, nfft, nfilt, fs);
         mfcc::calculateDCTCoefficients(&DCTArray, num_ceps, nfilt);
         coeffecients_initialized = true;
     }

@@ -14,7 +14,7 @@ namespace mfcc {
 
     void preemphasis(float* samples, int num_samples, float b);
 
-    int getMelFilterBanks (float** MelFilterArray, int nfft, int numFilters, int frameSize, int sampleRate);
+    int getMelFilterBanks (float** MelFilterArray, int nfft, int numFilters, int sampleRate);
 
     int calculateDCTCoefficients(float** DCTArray, int melCoeffecients, int numFilters);
 

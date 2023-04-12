@@ -30,21 +30,20 @@ namespace mfcc {
     /*
      * Description
      */
-    int getMelFilterBanks (float** MelFilterArray, int nfft, int numFilters, int frameSize, int sampleRate) {
+    int getMelFilterBanks (float** MelFilterArray, int nfft, int numFilters, int sampleRate) {
 
-        /* initializing the numFilters x frameSize filter bank 2d array */
+        /* initializing the numFilters x (nfft / 2 + 1) filter bank 2d array */
         int fbank_rows = numFilters;
         int fbank_cols = nfft / 2 + 1;
         int fbank_size = fbank_rows * fbank_cols;
         float * curr_bank = new float[fbank_size];
-        int width = (nfft/2) + 1;
 
         /* bank holding the mel filter banks */
-        #define curr_bank_(i1, i0) curr_bank[(i1*width) + i0]
+        #define curr_bank_(i1, i0) curr_bank[(i1*fbank_cols) + i0]
 
         /* lower and upper mel frequency bound */
         float low_freq = 0;
-        float high_freq = 2595.0 * log10(1 + sampleRate/700.0);
+        float high_freq = 2595.0 * log10f(1 + sampleRate/700.0);
 
         int num_bins = numFilters + 2;
 
@@ -55,8 +54,7 @@ namespace mfcc {
         float hz_point;
         for (int i = 0; i < num_bins; i++) {
             mel_point = i * mel_step;
-//            hz_point = 700 * ( pow(10.0, mel_point / 2595.0) - 1 );
-            hz_point = 700 * ( (10.0 + mel_point / 2595.0) - 1 );
+            hz_point = 700 * ( powf(10.0, mel_point / 2595.0) - 1 );
             bins[i] = int( (nfft + 1) * hz_point / (sampleRate*2) );
         }
 
@@ -97,7 +95,7 @@ namespace mfcc {
         /* fill in the dct array */
         for (int n = 0; n < melCoeffecients; n++) {
             for (int m = 0; m < numFilters; m++) {
-                curr_dct_(n, m) = cos(M_PI * n * (m-0.5) / numFilters);
+                curr_dct_(n, m) = cosf((M_PI * n * (m-0.5)) / numFilters);
             }
         }
 
@@ -133,8 +131,10 @@ namespace mfcc {
             /* iterate through input 2's columns (n) */
             for (int col = 0; col < n; col++) {
                 /* iterate through the shared dimension and calculate cell */
+                out_(row, col) = 0; // initialize
                 for (int i = 0; i < k; i++) {
-                    out_(row, col) += in_1_(row, i) * in_2_(i, col);
+                    float result = in_1_(row, i) * in_2_(i, col);
+                    out_(row, col) += (std::isinf(result) || std::isnan(result)) ? 0 : result;
                 }
             }
         }
