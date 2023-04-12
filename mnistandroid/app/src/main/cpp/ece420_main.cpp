@@ -21,7 +21,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jcl
 
 JNIEXPORT void JNICALL
 Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz,
-        jobject bufferPtr);
+        jobject bufferPtr, jfloatArray outputArray);
 }
 
 // Student Variables
@@ -54,6 +54,9 @@ const int nfilt = 40; // number of filter banks to create
 const int num_ceps = 13; // number of cepstral coefficients to output
 const int nn_data_cols = 48; // number of frames to work with
 const int nn_data_rows = 12; // is always num_ceps - 1
+bool coeffecients_initialized = false;
+float* MelFilterArray = nullptr;
+float* DCTArray = nullptr;
 
 /* Hanning Window */
 float hanning_window[nfft] = {};
@@ -342,7 +345,7 @@ void applyHanning(float* frame) {
     return;
 }
 
-void performSTFT(float *samples, float* frequencies, int num_samples, int noverlap, int sample_rate, bool oneSided){
+int performSTFT(float *samples, float** frequencies, int num_samples, int sample_rate, bool oneSided){
 
     if (noverlap < 0)
         noverlap = nfft / 2;
@@ -355,13 +358,16 @@ void performSTFT(float *samples, float* frequencies, int num_samples, int noverl
     while ( (num_ffts - 1)*step + (nfft - 1) >= num_samples)
         num_ffts--;
 
+    int stft_output_size = num_ffts * (nfft / 2 + 1);
+    float* frequencies_ = new float[stft_output_size];
+
     // Apply fft with KISS_FFT engine
     kiss_fft_cfg cfg = kiss_fft_alloc(nfft, 0, NULL, NULL);
     kiss_fft_cpx in[nfft];
     kiss_fft_cpx out[nfft];
 
     /* applying fft for all frames */
-    std::vector<std::vector<float>> stft_result(int(nfft/2 + 1), std::vector<float>(num_ffts, 0));
+//    std::vector<std::vector<float>> stft_result(int(nfft/2 + 1), std::vector<float>(num_ffts, 0));
     for (int n = 0; n < num_ffts; n++) {
 
         /* apply hanning window */
@@ -379,24 +385,67 @@ void performSTFT(float *samples, float* frequencies, int num_samples, int noverl
         /* convert output to decibals and store result */
         if (oneSided) {
             for (int i = 0; i < int(nfft/2 + 1); i++)
-                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
+//                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
+                frequencies_[i * num_ffts + n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
         }
         else {
             for (int i = 0; i < nfft; i++)
-                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
+//                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
+                frequencies_[i * num_ffts + n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
         }
     }
     kiss_fft_free(cfg);
 
-    /* apply the filter banks */
+    *frequencies = frequencies_;
 
-    /* apply the dct */
-
-
-    /* return final output */
-
-    return;
+    return stft_output_size;
 }
+
+int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, int num_frames, float preemphasis_b, int sampling_rate) {
+
+    /* apply preemphasis filter */
+    mfcc::preemphasis(samples, num_samples, preemphasis_b);
+
+    /* apply stft */
+    float* stft_output = nullptr;
+    int stft_output_size = performSTFT(samples, &stft_output, num_samples, sampling_rate, true);
+
+    /* apply the mel filter banks */
+    int mel_filtered_output_size = nfilt * num_frames;
+    float* mel_filtered_output = new float[mel_filtered_output_size];
+    mfcc::gemmMultiplication(MelFilterArray, stft_output, mel_filtered_output, nfft / 2 + 1, num_frames);
+
+    /* stft_output no longer needed */
+    delete [] stft_output;
+
+    /* take log base 10 of output before applying DCT */
+    for (int i = 0; i < mel_filtered_output_size; i++) {
+        mel_filtered_output[i] = log10(mel_filtered_output[i]);
+    }
+
+    /* perform DCT */
+    int ceps_output_size = num_ceps * num_frames;
+    float* ceps_output = new float [ceps_output_size];
+
+    mfcc::gemmMultiplication(DCTArray, mel_filtered_output, ceps_output, num_ceps, nfilt, num_frames);
+
+    /* no longer need mel_filterd_output array */
+    delete [] mel_filtered_output;
+
+    /* trim the output to the desired size */
+    int final_output_size = nn_data_cols * nn_data_rows;
+    float* final_output = new float[final_output_size];
+
+    for (int i = 0; i < nn_data_rows; i++) {
+        for (int j = 0; j < nn_data_cols; i++) {
+            final_output[i * nn_data_cols + j] = mel_filtered_output[i * nn_data_cols + j];
+        }
+    }
+
+    /* return the final output and its size */
+    *mfcc_frequencies = final_output;
+    return final_output_size;
+};
 
 
 JNIEXPORT void JNICALL
@@ -424,10 +473,28 @@ Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jcl
 }
 
 JNIEXPORT void JNICALL
-Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz,
-                                                            jobject bufferPtr) {
+Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz, jobject bufferPtr, jfloatArray outputArray) {
     // TODO: implement performMFCC()
 //    jfloat *buffer = (jfloat *) env->GetDirectBufferAddress(bufferPtr);
+    /* typecasting should hopefully work since jfloat and float should be the same data struct */
+    float* buffer = (float *) env->GetDirectBufferAddress(bufferPtr);
 
+    /* Initialize DCT and MelFilter arrays if not initialized */
+    if (!coeffecients_initialized) {
+        mfcc::getMelFilterBanks(&MelFilterArray, nfft, nfilt, nn_data_cols, fs);
+        mfcc::calculateDCTCoefficients(&DCTArray, num_ceps, nfilt);
+        coeffecients_initialized = true;
+    }
 
-}
+    int buffer_size = 48000 * 3; // should be size of samples from recording
+
+    /* create array that will hold the final output */
+    float* final_output = nullptr;
+    int final_output_size = performMFCC(buffer, &final_output, buffer_size, nn_data_cols, 0.6, fs);
+
+    // Copy the final_output to the outputArray
+    env->SetFloatArrayRegion(outputArray, 0, final_output_size, final_output);
+    delete [] final_output;
+
+    return;
+};

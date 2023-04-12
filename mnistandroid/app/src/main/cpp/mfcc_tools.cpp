@@ -163,9 +163,11 @@ namespace mfcc {
     }
 
     void applyFirFilter(float* samples, int num_samples) {
+        /* use the firFilter helper function that applies the filter to an individual sample */
         for (int i = 0; i < num_samples; i++) {
             samples[i] = firFilter(samples[i]);
         }
+        /* reset the global value used for the fir filter */
         resetFirCircBuf();
 
         return;

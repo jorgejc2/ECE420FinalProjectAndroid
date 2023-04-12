@@ -670,5 +670,5 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     public static native void resetParameters();
 
     /* function for doing mfcc */
-    public static native void performMFCC(FloatBuffer bufferPtr);
+    public static native void performMFCC(FloatBuffer bufferPtr, float[] outputArray);
 }
