@@ -162,46 +162,47 @@ void ece420ProcessFrame(sample_buf *dataBuf) {
         data[i] = ((uint16_t) dataBuf->buf_[2 * i]) | (((uint16_t) dataBuf->buf_[2 * i + 1]) << 8);
     }
 
-    // Shift our old data back to make room for the new data
-    for (int i = 0; i < 2 * FRAME_SIZE; i++) {
-        bufferIn[i] = bufferIn[i + FRAME_SIZE - 1];
-    }
+    /* not needed since this was for lab 5 so it wastes time
 
-    // Finally, put in our new data.
-    for (int i = 0; i < FRAME_SIZE; i++) {
-        bufferIn[i + 2 * FRAME_SIZE - 1] = (float) data[i];
-    }
-
-    // The whole kit and kaboodle -- pitch shift
-    bool isVoiced = lab5PitchShift(bufferIn);
-
-    if (isVoiced) {
-        for (int i = 0; i < FRAME_SIZE; i++) {
-            int16_t newVal = (int16_t) bufferOut[i];
-
-            uint8_t lowByte = (uint8_t) (0x00ff & newVal);
-            uint8_t highByte = (uint8_t) ((0xff00 & newVal) >> 8);
-            dataBuf->buf_[i * 2] = lowByte;
-            dataBuf->buf_[i * 2 + 1] = highByte;
-        }
-    }
-
-    // Very last thing, update your output circular buffer!
-    for (int i = 0; i < 2 * FRAME_SIZE; i++) {
-        bufferOut[i] = bufferOut[i + FRAME_SIZE - 1];
-    }
-
-    /* the 'past' buffer was perfectly reconstructed and sent, so we can shift it out */
-    for (int i = 0; i < FRAME_SIZE; i++) {
-        bufferOut[i + 2 * FRAME_SIZE - 1] = 0;
-    }
+//    // Shift our old data back to make room for the new data
+//    for (int i = 0; i < 2 * FRAME_SIZE; i++) {
+//        bufferIn[i] = bufferIn[i + FRAME_SIZE - 1];
+//    }
+//
+//    // Finally, put in our new data.
+//    for (int i = 0; i < FRAME_SIZE; i++) {
+//        bufferIn[i + 2 * FRAME_SIZE - 1] = (float) data[i];
+//    }
+//
+//    // The whole kit and kaboodle -- pitch shift
+//    bool isVoiced = lab5PitchShift(bufferIn);
+//
+//    if (isVoiced) {
+//        for (int i = 0; i < FRAME_SIZE; i++) {
+//            int16_t newVal = (int16_t) bufferOut[i];
+//
+//            uint8_t lowByte = (uint8_t) (0x00ff & newVal);
+//            uint8_t highByte = (uint8_t) ((0xff00 & newVal) >> 8);
+//            dataBuf->buf_[i * 2] = lowByte;
+//            dataBuf->buf_[i * 2 + 1] = highByte;
+//        }
+//    }
+//
+//    // Very last thing, update your output circular buffer!
+//    for (int i = 0; i < 2 * FRAME_SIZE; i++) {
+//        bufferOut[i] = bufferOut[i + FRAME_SIZE - 1];
+//    }
+//
+//    /* the 'past' buffer was perfectly reconstructed and sent, so we can shift it out */
+//    for (int i = 0; i < FRAME_SIZE; i++) {
+//        bufferOut[i + 2 * FRAME_SIZE - 1] = 0;
+//    }
     /* for our purposes, we need to save the samples to the front end */
 
     for (int i = 0; i < FRAME_SIZE; i++) {
         if (threeSecondSamples_idx + i >= threeSecondSampleSize)
             break;
-        /* DEBUG changing the data type of the raw data */
-//        threeSecondSamples[threeSecondSamples_idx + i] = float(data[i] < 0 ? ((0xFFFF << 16) | data[i]) : ((0x0000 << 16) | data[i]));
+
         threeSecondSamples[threeSecondSamples_idx + i] = data[i];
     }
     if (threeSecondSamples_idx < threeSecondSampleSize)
@@ -417,24 +418,32 @@ int performSTFT(float *samples, float** frequencies, int num_samples, int sample
     return stft_output_size;
 }
 
-//int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, int num_frames, float preemphasis_b, int sampling_rate) {
-int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int num_frames, float preemphasis_b, int sampling_rate) {
+int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int num_frames, float preemphasis_b) {
 
     float* f_samples = new float[num_samples];
 
     mfcc::int16ToFloat(samples, f_samples, num_samples);
 
+    /* apply FIR filter */
+    mfcc::applyFirFilter(f_samples, num_samples);
+
+    /* downsample */
+    float* down_sampled_sig;
+    int down_sampled_sig_size = mfcc::downsample(f_samples, &down_sampled_sig, num_samples, fs, down_sampled_fs);
+
+    delete [] f_samples; // no longer needed
+
     /* apply preemphasis filter */
-    mfcc::preemphasis(f_samples, num_samples, preemphasis_b);
+    mfcc::preemphasis(down_sampled_sig, down_sampled_sig_size, preemphasis_b);
 
     /* apply stft */
     float* stft_output = nullptr;
-    int stft_output_size = performSTFT(f_samples, &stft_output, num_samples, sampling_rate, true);
+    int stft_output_size = performSTFT(down_sampled_sig, &stft_output, down_sampled_sig_size, down_sampled_fs, true);
     int stft_num_frames = stft_output_size / (nfft / 2 + 1);
 
-    delete [] f_samples;
+    delete [] down_sampled_sig; // no longer needed
 
-    float * trimmed_stft_output = new float [(nfft / 2 + 1) * nn_data_cols];
+    float* trimmed_stft_output = new float [(nfft / 2 + 1) * nn_data_cols];
 
     for (int row = 0; row < (nfft / 2 + 1); row++) {
         for (int col = 0; col < nn_data_cols; col++) {
@@ -486,6 +495,8 @@ int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int
         }
     }
 
+    delete [] ceps_output; // no longer needed
+
     /* return the final output and its size */
     *mfcc_frequencies = final_output;
     return final_output_size;
@@ -525,7 +536,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
 
     /* Initialize DCT and MelFilter arrays if not initialized */
     if (!coeffecients_initialized) {
-        mfcc::getMelFilterBanks(&MelFilterArray, nfft, nfilt, fs);
+        mfcc::getMelFilterBanks(&MelFilterArray, nfft, nfilt, down_sampled_fs);
         mfcc::calculateDCTCoefficients(&DCTArray, num_ceps, nfilt);
         coeffecients_initialized = true;
     }
@@ -534,7 +545,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
 
     /* create array that will hold the final output */
     float* final_output = nullptr;
-    int final_output_size = performMFCC(buffer, &final_output, buffer_size, nn_data_cols, 0.6, fs);
+    int final_output_size = performMFCC(buffer, &final_output, buffer_size, nn_data_cols, 0.6);
 
     // Copy the final_output to the outputArray
     env->SetFloatArrayRegion(outputArray, 0, final_output_size, final_output);

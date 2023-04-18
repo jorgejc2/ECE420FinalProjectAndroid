@@ -109,7 +109,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     private static final int FRAME_SIZE = 1024;
     private static final int MIN_FREQ = 50;
 
-    private float[] audio_samples;
+    private short[] audio_samples;
     private int audio_samples_idx = 0;
     private Timer timer;
     private int recording_duration = 0; // duration of recording in ms, should end at 30,000 ms
@@ -156,7 +156,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         }
 
         /* should be able to hold 3 seconds worth of data */
-        audio_samples = new float[48000 * 3];
+        audio_samples = new short[48000 * 3];
         timer = new Timer();
 
         /**********************************************************************************************/
@@ -426,7 +426,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
                     Date currentTime = Calendar.getInstance().getTime();
                     File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_rawsamples.csv");
-                    writeSamplesToCSVFromBuf(rootPath, buffer);
+                    writeSamplesToCSVFromShortArray(rootPath, audio_samples);
 
                     /* reset parameters for the 3 second buffer in the C++ end */
                     resetParameters();
@@ -440,7 +440,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
                     currentTime = Calendar.getInstance().getTime();
                     rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_processed.csv");
-                    writeSamplesToCSVFromArray(rootPath, mfcc_output);
+                    writeSamplesToCSVFromFloatArray(rootPath, mfcc_output);
 
                 }
 
@@ -660,12 +660,33 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         }
     }
 
-    private void writeSamplesToCSVFromArray(File file, float[] buff) {
+    private void writeSamplesToCSVFromFloatArray(File file, float[] buff) {
         FileOutputStream fileOutputStream = null;
         try {
             fileOutputStream = new FileOutputStream(file);
             for (int i = 0; i < 48000 * 3; i++) {
                 fileOutputStream.write(String.format("%f\n", buff[i]).getBytes());
+            }
+            Toast.makeText(this, "Done writing to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (fileOutputStream != null) {
+                try {
+                    fileOutputStream.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private void writeSamplesToCSVFromShortArray(File file, short[] buff) {
+        FileOutputStream fileOutputStream = null;
+        try {
+            fileOutputStream = new FileOutputStream(file);
+            for (int i = 0; i < 48000 * 3; i++) {
+                fileOutputStream.write(String.format("%d\n", buff[i]).getBytes());
             }
             Toast.makeText(this, "Done writing to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
