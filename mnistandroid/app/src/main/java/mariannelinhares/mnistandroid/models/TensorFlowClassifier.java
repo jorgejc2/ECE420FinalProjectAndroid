@@ -34,7 +34,8 @@ public class TensorFlowClassifier implements Classifier {
     private String name;
     private String inputName;
     private String outputName;
-    private int inputSize;
+    private int dim1;
+    private int dim2;
     private boolean feedKeepProb;
 
     private List<String> labels;
@@ -60,7 +61,7 @@ public class TensorFlowClassifier implements Classifier {
     //fill out a classifier object with all the necessary
     //metadata including output prediction
     public static TensorFlowClassifier create(AssetManager assetManager, String name,
-            String modelPath, String labelFile, int inputSize, String inputName, String outputName,
+            String modelPath, String labelFile, int dim1, int dim2, String inputName, String outputName,
             boolean feedKeepProb) throws IOException {
         //intialize a classifier
         TensorFlowClassifier c = new TensorFlowClassifier();
@@ -79,7 +80,8 @@ public class TensorFlowClassifier implements Classifier {
         int numClasses = 10;
 
         //how big is the input?
-        c.inputSize = inputSize;
+        c.dim1 = dim1;
+        c.dim2 = dim2;
 
         // Pre-allocate buffer.
         c.outputNames = new String[] { outputName };
@@ -103,7 +105,7 @@ public class TensorFlowClassifier implements Classifier {
         //using the interface
         //give it the input name, raw pixels from the drawing,
         //input size
-        tfHelper.feed(inputName, pixels, 1, inputSize, inputSize, 1);
+        tfHelper.feed(inputName, pixels, 1, dim1, dim2, 1);
 
         //probabilities
         if (feedKeepProb) {

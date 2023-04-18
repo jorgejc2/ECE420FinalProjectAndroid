@@ -12,6 +12,8 @@ using namespace std;
 
 namespace mfcc {
 
+    void int16ToFloat(const int16_t* original_samples, float* new_samples, int num_samples);
+
     void preemphasis(float* samples, int num_samples, float b);
 
     int getMelFilterBanks (float** MelFilterArray, int nfft, int numFilters, int sampleRate);

@@ -14,6 +14,11 @@ int circBufIdx = 0;
 
 namespace mfcc {
 
+    void int16ToFloat(const int16_t* original_samples, float* new_samples, int num_samples) {
+        for (int i = 0; i < num_samples; i++)
+            new_samples[i] = float((original_samples[i]>>2)/(32768.0));
+    }
+
     /* MFCC algorithms */
     void preemphasis(float* samples, int num_samples, float b) {
 

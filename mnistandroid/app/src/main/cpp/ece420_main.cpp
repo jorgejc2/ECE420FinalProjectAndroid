@@ -47,7 +47,7 @@ float rawSamples[FRAME_SIZE] = {}; // holds raw samples to be copied over to fro
 
 const int threeSecondSampleSize = F_S * 3;
 int threeSecondSamples_idx = 0;
-float threeSecondSamples[threeSecondSampleSize] = {};
+int16_t threeSecondSamples[threeSecondSampleSize] = {};
 
 /* processing parameters */
 const int fs = 48000; // sampling rate (pre down sampling)
@@ -200,6 +200,8 @@ void ece420ProcessFrame(sample_buf *dataBuf) {
     for (int i = 0; i < FRAME_SIZE; i++) {
         if (threeSecondSamples_idx + i >= threeSecondSampleSize)
             break;
+        /* DEBUG changing the data type of the raw data */
+//        threeSecondSamples[threeSecondSamples_idx + i] = float(data[i] < 0 ? ((0xFFFF << 16) | data[i]) : ((0x0000 << 16) | data[i]));
         threeSecondSamples[threeSecondSamples_idx + i] = data[i];
     }
     if (threeSecondSamples_idx < threeSecondSampleSize)
@@ -415,15 +417,22 @@ int performSTFT(float *samples, float** frequencies, int num_samples, int sample
     return stft_output_size;
 }
 
-int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, int num_frames, float preemphasis_b, int sampling_rate) {
+//int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, int num_frames, float preemphasis_b, int sampling_rate) {
+int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int num_frames, float preemphasis_b, int sampling_rate) {
+
+    float* f_samples = new float[num_samples];
+
+    mfcc::int16ToFloat(samples, f_samples, num_samples);
 
     /* apply preemphasis filter */
-    mfcc::preemphasis(samples, num_samples, preemphasis_b);
+    mfcc::preemphasis(f_samples, num_samples, preemphasis_b);
 
     /* apply stft */
     float* stft_output = nullptr;
-    int stft_output_size = performSTFT(samples, &stft_output, num_samples, sampling_rate, true);
+    int stft_output_size = performSTFT(f_samples, &stft_output, num_samples, sampling_rate, true);
     int stft_num_frames = stft_output_size / (nfft / 2 + 1);
+
+    delete [] f_samples;
 
     float * trimmed_stft_output = new float [(nfft / 2 + 1) * nn_data_cols];
 
@@ -493,7 +502,7 @@ JNIEXPORT void JNICALL
 Java_mariannelinhares_mnistandroid_MainActivity_getCompleteSamplesBuffer(JNIEnv *env, jclass clazz,
                                                                          jobject bufferPtr) {
     // TODO: implement getCompleteSamplesBuffer()
-    jfloat *buffer = (jfloat *) env->GetDirectBufferAddress(bufferPtr);
+    jshort *buffer = (jshort *) env->GetDirectBufferAddress(bufferPtr);
     // thread-safe, kinda
     for (int i = 0; i < threeSecondSampleSize; i++)
         buffer[i] = threeSecondSamples[i];
@@ -512,7 +521,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
     // TODO: implement performMFCC()
 //    jfloat *buffer = (jfloat *) env->GetDirectBufferAddress(bufferPtr);
     /* typecasting should hopefully work since jfloat and float should be the same data struct */
-    float* buffer = (float *) env->GetDirectBufferAddress(bufferPtr);
+    int16_t * buffer = (jshort *) env->GetDirectBufferAddress(bufferPtr);
 
     /* Initialize DCT and MelFilter arrays if not initialized */
     if (!coeffecients_initialized) {

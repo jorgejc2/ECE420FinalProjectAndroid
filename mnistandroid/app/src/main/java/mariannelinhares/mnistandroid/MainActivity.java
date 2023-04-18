@@ -55,6 +55,8 @@ import android.widget.Toast;
 //Resizable-array implementation of the List interface. Implements all optional list operations, and permits all elements,
 // including null. In addition to implementing the List interface, this class provides methods to
 // //manipulate the size of the array that is used internally to store the list.
+import java.nio.IntBuffer;
+import java.nio.ShortBuffer;
 import java.util.ArrayList;
 // basic list
 import java.util.List;
@@ -221,10 +223,12 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                     mClassifiers.add(
                             TensorFlowClassifier.create(getAssets(), "TensorFlow",
                                     "opt_mnist_convnet-tf.pb", "labels.txt", PIXEL_WIDTH,
+                                    PIXEL_WIDTH,
                                     "input", "output", true));
                     mClassifiers.add(
                             TensorFlowClassifier.create(getAssets(), "Keras",
                                     "opt_mnist_convnet-keras.pb", "labels.txt", PIXEL_WIDTH,
+                                    PIXEL_WIDTH,
                                     "conv2d_1_input", "dense_2/Softmax", false));
                 } catch (final Exception e) {
                     //if they aren't found, throw an error!
@@ -407,10 +411,10 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                     deleteAudioRecorder();
                     deleteSLBufferQueueAudioPlayer();
 
-                    /* float is 4 bytes, 48000*3 total samples for 3 seconds of audio */
-                    FloatBuffer buffer = ByteBuffer.allocateDirect(48000 * 3 * 4)
+                    /* short is 2 bytes, 48000*3 total samples for 3 seconds of audio */
+                    ShortBuffer buffer = ByteBuffer.allocateDirect(48000 * 3 * 2)
                             .order(ByteOrder.LITTLE_ENDIAN)
-                            .asFloatBuffer();
+                            .asShortBuffer();
 
                     /* get the three seconds worth of data from the C++ end */
                     getCompleteSamplesBuffer(buffer);
@@ -635,12 +639,12 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         }
     }
 
-    private void writeSamplesToCSVFromBuf(File file, FloatBuffer buff) {
+    private void writeSamplesToCSVFromBuf(File file, ShortBuffer buff) {
         FileOutputStream fileOutputStream = null;
         try {
             fileOutputStream = new FileOutputStream(file);
             for (int i = 0; i < 48000 * 3; i++) {
-                fileOutputStream.write(String.format("%f\n", buff.get()).getBytes());
+                fileOutputStream.write(String.format("%d\n", buff.get()).getBytes());
             }
             Toast.makeText(this, "Done writing to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
@@ -699,10 +703,10 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     public static native void stopPlay();
 
     public static native void writeNewFreq(int freq);
-    public static native void getCompleteSamplesBuffer(FloatBuffer bufferPtr);
+    public static native void getCompleteSamplesBuffer(ShortBuffer bufferPtr);
     public static native void resetParameters();
 
     /* function for doing mfcc */
-    public static native void performMFCC(FloatBuffer bufferPtr, float[] outputArray);
+    public static native void performMFCC(ShortBuffer bufferPtr, float[] outputArray);
     public native int[] getRowAndCol();
 }
