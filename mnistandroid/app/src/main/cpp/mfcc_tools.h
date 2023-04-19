@@ -32,6 +32,8 @@ namespace mfcc {
 
     void resetFirCircBuf();
 
+    void viewMelFilters(float* mel_filter_array, float* output, int mel_filter_size);
+
 }
 
 #endif //MNISTANDROID_MFCC_TOOLS_H

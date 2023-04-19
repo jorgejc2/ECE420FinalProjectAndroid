@@ -61,7 +61,7 @@ namespace mfcc {
         float hz_point;
         for (int i = 0; i < num_bins; i++) {
             mel_point = i * mel_step;
-            hz_point = 700 * ( powf(10.0, mel_point / 2595.0) - 1.0 );
+            hz_point = 700 * ( pow(10.0, mel_point / 2595) - 1 );
             bins[i] = int( (nfft + 1) * hz_point / sampleRate );
         }
 
@@ -80,17 +80,16 @@ namespace mfcc {
             for (int k = f_m_minus; k < f_m; k++) {
                 curr_val = (float)((2.0*(k - bins[m-1])) / (bins[m] - bins[m - 1]));
                 assert(curr_val >= 0);
-                curr_bank_(m-1, k) = curr_val;
+//                curr_bank_(m-1, k) = curr_val;
+                curr_bank[(m-1)*(nfft/2+1) + k] = curr_val;
             }
             for (int k = f_m; k < f_m_plus; k++) {
                 curr_val = (float)((2.0*(bins[m+1] - k)) / (bins[m + 1] - bins[m]));
                 assert(curr_val >= 0);
-                curr_bank_(m-1, k) = curr_val;
+//                curr_bank_(m-1, k) = curr_val;
+                curr_bank[(m-1)*(nfft/2+1) + k] = curr_val;
             }
         }
-
-        for (int i = 0; i < fbank_size; i++)
-            curr_bank[i] = 1;
 
         *MelFilterArray = curr_bank;
 
@@ -105,12 +104,13 @@ namespace mfcc {
     int calculateDCTCoefficients(float** DCTArray, int melCoeffecients, int numFilters) {
         int dct_size = melCoeffecients * numFilters;
         float* curr_dct = new float[dct_size];
-        #define curr_dct_(i1, i0) curr_dct[(i1 * numFilters) + i0]
+//        #define curr_dct_(i1, i0) curr_dct[(i1 * numFilters) + i0]
 
         /* fill in the dct array */
         for (int n = 0; n < melCoeffecients; n++) {
             for (int m = 0; m < numFilters; m++) {
-                curr_dct_(n, m) = cosf((M_PI * n * (m-0.5)) / numFilters);
+//                curr_dct_(n, m) = cosf((M_PI * n * (m-0.5)) / numFilters);
+                curr_dct[n * numFilters + m] = cos((M_PI * n * (m-0.5)) / numFilters);
             }
         }
 
@@ -119,7 +119,7 @@ namespace mfcc {
 
         return dct_size;
 
-        #undef curr_dct_
+//        #undef curr_dct_
     };
 
     /*
@@ -247,6 +247,11 @@ namespace mfcc {
         circBufIdx = 0;
         for (int i = 0; i < N_TAPS; i++)
             circBuf[i] = 0;
+    }
+
+    void viewMelFilters(float* mel_filter_array, float* output, int mel_filter_size) {
+        for (int i = 0; i < mel_filter_size; i++)
+            output[i] = mel_filter_array[i];
     }
 
 };

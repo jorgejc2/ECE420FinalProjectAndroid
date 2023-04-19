@@ -432,7 +432,6 @@ int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int
     mfcc::int16ToFloat(samples, f_samples, num_samples);
 
     /* apply FIR filter */
-//    mfcc::applyFirFilter(f_samples, num_samples);
     mfcc::applyFirFilterSeries(f_samples, num_samples);
 
     /* downsample */
@@ -451,23 +450,10 @@ int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int
 
     delete [] down_sampled_sig; // no longer needed
 
-//    float* trimmed_stft_output = new float [int(nfft / 2 + 1) * nn_data_cols];
-//
-//    for (int row = 0; row < (nfft / 2 + 1); row++) {
-//        for (int col = 0; col < nn_data_cols; col++) {
-//            trimmed_stft_output[row * nn_data_cols + col] = stft_output[row * stft_num_frames + col];
-//        }
-//    }
-
-
     /* apply the mel filter banks */
-//    int mel_filtered_output_size = nfilt * num_frames;
     int mel_filtered_output_size = nfilt * stft_num_frames;
     float* mel_filtered_output = new float[mel_filtered_output_size];
-//    float* mel_filter_array_;
-//    int mel_filter_array_size_ = mfcc::getMelFilterBanks(&mel_filter_array_, nfft, nfilt, down_sampled_fs);
     mfcc::gemmMultiplication(MelFilterArray, stft_output, mel_filtered_output, nfilt, int(nfft / 2 + 1), stft_num_frames);
-//    mfcc::gemmMultiplication(MelFilterArray, trimmed_stft_output, mel_filtered_output, nfilt, nfft / 2 + 1, num_frames);
 
     int mel_zeros = 0;
     int mel_negs = 0;
@@ -490,22 +476,10 @@ int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int
 
     delete [] stft_output;
 
-    int numNeg = 0;
-    int numZero = 0;
-    int inf = 0;
-    int nan = 0;
     /* take log base 10 of output before applying DCT */
     for (int i = 0; i < mel_filtered_output_size; i++) {
         float temp = mel_filtered_output[i];
-        if (temp == 0)
-            numZero++;
-        if (temp < 0)
-            numNeg++;
-        mel_filtered_output[i] = log10f(temp);
-        if (std::isinf(mel_filtered_output[i]))
-            inf++;
-        if (std::isnan(mel_filtered_output[i]))
-            nan++;
+        mel_filtered_output[i] = log10(temp);
     }
 
     /* perform DCT */
@@ -516,38 +490,6 @@ int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int
 
     /* no longer need mel_filterd_output array */
     delete [] mel_filtered_output;
-
-//    /* trim the output to the desired size */
-//    int final_output_size = nn_data_cols * nn_data_rows;
-//    float* final_output = new float[final_output_size];
-//
-//    for (int i = 0; i < nn_data_rows; i++) {
-//        for (int j = 0; j < nn_data_cols; j++) {
-//            final_output[i * nn_data_cols + j] = ceps_output[i * num_frames + j];
-//        }
-//    }
-//
-//    delete [] ceps_output; // no longer needed
-//
-//    /* return the final output and its size */
-//    *mfcc_frequencies = final_output;
-//    return final_output_size;
-
-    numNeg = 0;
-    numZero = 0;
-    inf = 0;
-    nan = 0;
-    for (int i = 0; i < ceps_output_size; i++) {
-        float temp = ceps_output[i];
-        if (temp == 0)
-            numZero++;
-        if (temp < 0)
-            numNeg++;
-        if (std::isinf(ceps_output[i]))
-            inf++;
-        if (std::isnan(ceps_output[i]))
-            nan++;
-    }
 
     ret_rows = num_ceps;
     ret_cols = stft_num_frames;
@@ -595,6 +537,8 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
         coeffecients_initialized = true;
     }
 
+    /* DEBUG temporarily cutting out mfcc code */
+
     int buffer_size = 48000 * 3; // should be size of samples from recording
 
     /* create array that will hold the final output */
@@ -609,15 +553,22 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
     /* trim the output to only take the first 48 frames, but later pitch detection will go here */
     for (int row = 0; row < nn_data_rows; row++) {
         for (int col = 0; col < nn_data_cols; col++) {
-            final_output[row * nn_data_cols + col] = mfcc_output[row * mfcc_cols + col];
+//            final_output[row * nn_data_cols + col] = mfcc_output[(row+1) * mfcc_cols + col];
+            final_output[row * nn_data_cols + col] = mfcc_output[(row+1) * mfcc_cols + col];
         }
     }
 
     delete [] mfcc_output;
 
+//    int fbank_col = nfilt;
+//    int fbank_row = int(nfft/2+1);
+//    int final_output_size = fbank_row * fbank_col;
+//    float* final_output = new float[final_output_size];
+//    mfcc::viewMelFilters(MelFilterArray, final_output, final_output_size);
+
     // Copy the final_output to the outputArray
     env->SetFloatArrayRegion(outputArray, 0, final_output_size, final_output);
-//    delete [] final_output;
+    delete [] final_output;
 
     return;
 };
@@ -628,8 +579,9 @@ Java_mariannelinhares_mnistandroid_MainActivity_getRowAndCol(JNIEnv *env, jclass
     if (result == nullptr) {
         return nullptr; // Out of memory error
     }
-
+    /* DEBUG, temporarily returning mel filter size */
     jint tempArray[] = {nn_data_rows, nn_data_cols};
+//    jint tempArray[] = {nfilt, int(nfft/2+1)};
     env->SetIntArrayRegion(result, 0, 2, tempArray);
     return result;
 };
