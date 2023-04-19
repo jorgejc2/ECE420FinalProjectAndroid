@@ -383,7 +383,7 @@ int performSTFT(float *samples, float** frequencies, int num_samples, int sample
 
         /* get the current samples we want */
         for (int i = 0; i < nfft; i++) {
-            curr_samples[i] = samples[n * step];
+            curr_samples[i] = samples[n * step + i];
         }
 
         /* apply hanning window */
@@ -399,16 +399,23 @@ int performSTFT(float *samples, float** frequencies, int num_samples, int sample
         kiss_fft(cfg, in, out);
 
         /* convert output to decibals and store result */
+        float curr_val;
         if (oneSided) {
-            for (int i = 0; i < int(nfft/2 + 1); i++)
+            for (int i = 0; i < int(nfft/2 + 1); i++) {
 //                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
 //                frequencies_[i * num_ffts + n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
-                frequencies_[i * num_ffts + n] = (out[i].r*out[i].r + out[i].i*out[i].i);
+                curr_val = fabs((out[i].r * out[i].r) + (out[i].i * out[i].i));
+                assert(curr_val >= 0);
+                frequencies_[i * num_ffts + n] = curr_val;
+            }
         }
         else {
-            for (int i = 0; i < nfft; i++)
+            for (int i = 0; i < nfft; i++) {
 //                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
-                frequencies_[i * num_ffts + n] = (out[i].r*out[i].r + out[i].i*out[i].i);
+                curr_val = fabs((out[i].r * out[i].r) + (out[i].i * out[i].i));
+                assert(curr_val >= 0);
+                frequencies_[i * num_ffts + n] = curr_val;
+            }
         }
     }
     kiss_fft_free(cfg);
@@ -418,7 +425,7 @@ int performSTFT(float *samples, float** frequencies, int num_samples, int sample
     return stft_output_size;
 }
 
-int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int num_frames, float preemphasis_b) {
+int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int num_frames, float preemphasis_b, int &ret_rows, int &ret_cols) {
 
     float* f_samples = new float[num_samples];
 
@@ -440,24 +447,48 @@ int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int
     /* apply stft */
     float* stft_output = nullptr;
     int stft_output_size = performSTFT(down_sampled_sig, &stft_output, down_sampled_sig_size, down_sampled_fs, true);
-    int stft_num_frames = stft_output_size / (nfft / 2 + 1);
+    int stft_num_frames = stft_output_size / int(nfft / 2 + 1);
 
     delete [] down_sampled_sig; // no longer needed
 
-    float* trimmed_stft_output = new float [(nfft / 2 + 1) * nn_data_cols];
+//    float* trimmed_stft_output = new float [int(nfft / 2 + 1) * nn_data_cols];
+//
+//    for (int row = 0; row < (nfft / 2 + 1); row++) {
+//        for (int col = 0; col < nn_data_cols; col++) {
+//            trimmed_stft_output[row * nn_data_cols + col] = stft_output[row * stft_num_frames + col];
+//        }
+//    }
 
-    for (int row = 0; row < (nfft / 2 + 1); row++) {
-        for (int col = 0; col < nn_data_cols; col++) {
-            trimmed_stft_output[row * nn_data_cols + col] = stft_output[row * stft_num_frames + col];
-        }
-    }
-    delete [] stft_output;
 
     /* apply the mel filter banks */
-    int mel_filtered_output_size = nfilt * num_frames;
+//    int mel_filtered_output_size = nfilt * num_frames;
+    int mel_filtered_output_size = nfilt * stft_num_frames;
     float* mel_filtered_output = new float[mel_filtered_output_size];
-//    mfcc::gemmMultiplication(MelFilterArray, stft_output, mel_filtered_output, nfilt, nfft / 2 + 1, num_frames);
-    mfcc::gemmMultiplication(MelFilterArray, trimmed_stft_output, mel_filtered_output, nfilt, nfft / 2 + 1, num_frames);
+//    float* mel_filter_array_;
+//    int mel_filter_array_size_ = mfcc::getMelFilterBanks(&mel_filter_array_, nfft, nfilt, down_sampled_fs);
+    mfcc::gemmMultiplication(MelFilterArray, stft_output, mel_filtered_output, nfilt, int(nfft / 2 + 1), stft_num_frames);
+//    mfcc::gemmMultiplication(MelFilterArray, trimmed_stft_output, mel_filtered_output, nfilt, nfft / 2 + 1, num_frames);
+
+    int mel_zeros = 0;
+    int mel_negs = 0;
+    int stft_zeros = 0;
+    int stft_negs = 0;
+
+    for (int i = 0; i < nfilt * (nfft/2+1); i++) {
+        if (MelFilterArray[i] == 0)
+            mel_zeros++;
+        if (MelFilterArray[i] < 0)
+            mel_negs++;
+    }
+
+    for (int i = 0; i < stft_output_size; i++) {
+        if (stft_output[i] == 0)
+            stft_zeros++;
+        if (stft_output[i] < 0)
+            stft_negs++;
+    }
+
+    delete [] stft_output;
 
     int numNeg = 0;
     int numZero = 0;
@@ -478,29 +509,51 @@ int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int
     }
 
     /* perform DCT */
-    int ceps_output_size = num_ceps * num_frames;
+    int ceps_output_size = num_ceps * stft_num_frames;
     float* ceps_output = new float [ceps_output_size];
 
-    mfcc::gemmMultiplication(DCTArray, mel_filtered_output, ceps_output, num_ceps, nfilt, num_frames);
+    mfcc::gemmMultiplication(DCTArray, mel_filtered_output, ceps_output, num_ceps, nfilt, stft_num_frames);
 
     /* no longer need mel_filterd_output array */
     delete [] mel_filtered_output;
 
-    /* trim the output to the desired size */
-    int final_output_size = nn_data_cols * nn_data_rows;
-    float* final_output = new float[final_output_size];
+//    /* trim the output to the desired size */
+//    int final_output_size = nn_data_cols * nn_data_rows;
+//    float* final_output = new float[final_output_size];
+//
+//    for (int i = 0; i < nn_data_rows; i++) {
+//        for (int j = 0; j < nn_data_cols; j++) {
+//            final_output[i * nn_data_cols + j] = ceps_output[i * num_frames + j];
+//        }
+//    }
+//
+//    delete [] ceps_output; // no longer needed
+//
+//    /* return the final output and its size */
+//    *mfcc_frequencies = final_output;
+//    return final_output_size;
 
-    for (int i = 0; i < nn_data_rows; i++) {
-        for (int j = 0; j < nn_data_cols; j++) {
-            final_output[i * nn_data_cols + j] = ceps_output[i * num_frames + j];
-        }
+    numNeg = 0;
+    numZero = 0;
+    inf = 0;
+    nan = 0;
+    for (int i = 0; i < ceps_output_size; i++) {
+        float temp = ceps_output[i];
+        if (temp == 0)
+            numZero++;
+        if (temp < 0)
+            numNeg++;
+        if (std::isinf(ceps_output[i]))
+            inf++;
+        if (std::isnan(ceps_output[i]))
+            nan++;
     }
 
-    delete [] ceps_output; // no longer needed
+    ret_rows = num_ceps;
+    ret_cols = stft_num_frames;
 
-    /* return the final output and its size */
-    *mfcc_frequencies = final_output;
-    return final_output_size;
+    *mfcc_frequencies = ceps_output;
+    return ceps_output_size;
 };
 
 
@@ -545,12 +598,26 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
     int buffer_size = 48000 * 3; // should be size of samples from recording
 
     /* create array that will hold the final output */
-    float* final_output = nullptr;
-    int final_output_size = performMFCC(buffer, &final_output, buffer_size, nn_data_cols, 0.6);
+    float* mfcc_output = nullptr;
+    int mfcc_rows;
+    int mfcc_cols;
+    performMFCC(buffer, &mfcc_output, buffer_size, nn_data_cols, 0.6, mfcc_rows, mfcc_cols);
+
+    int final_output_size = nn_data_cols*nn_data_rows;
+    float* final_output = new float[final_output_size];
+
+    /* trim the output to only take the first 48 frames, but later pitch detection will go here */
+    for (int row = 0; row < nn_data_rows; row++) {
+        for (int col = 0; col < nn_data_cols; col++) {
+            final_output[row * nn_data_cols + col] = mfcc_output[row * mfcc_cols + col];
+        }
+    }
+
+    delete [] mfcc_output;
 
     // Copy the final_output to the outputArray
     env->SetFloatArrayRegion(outputArray, 0, final_output_size, final_output);
-    delete [] final_output;
+//    delete [] final_output;
 
     return;
 };

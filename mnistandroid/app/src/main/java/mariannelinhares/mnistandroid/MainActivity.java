@@ -431,16 +431,18 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                     /* reset parameters for the 3 second buffer in the C++ end */
                     resetParameters();
 
+                    buffer.rewind();
                     /* get size to allocate for new buffer and perform mfcc */
                     int [] mfcc_dim = getRowAndCol();
                     int mfcc_rows = mfcc_dim[0];
                     int mfcc_cols = mfcc_dim[1];
-                    float [] mfcc_output = new float[mfcc_rows * mfcc_cols];
+                    int mfcc_output_size = mfcc_cols * mfcc_rows;
+                    float [] mfcc_output = new float[mfcc_output_size];
                     performMFCC(buffer, mfcc_output);
 
                     currentTime = Calendar.getInstance().getTime();
                     rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_processed.csv");
-                    writeSamplesToCSVFromFloatArray(rootPath, mfcc_output);
+                    writeSamplesToCSVFromFloatArray(rootPath, mfcc_output, mfcc_output_size);
 
                 }
 
@@ -660,11 +662,11 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         }
     }
 
-    private void writeSamplesToCSVFromFloatArray(File file, float[] buff) {
+    private void writeSamplesToCSVFromFloatArray(File file, float[] buff, int buff_size) {
         FileOutputStream fileOutputStream = null;
         try {
             fileOutputStream = new FileOutputStream(file);
-            for (int i = 0; i < 48000 * 3; i++) {
+            for (int i = 0; i < buff_size; i++) {
                 fileOutputStream.write(String.format("%f\n", buff[i]).getBytes());
             }
             Toast.makeText(this, "Done writing to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();

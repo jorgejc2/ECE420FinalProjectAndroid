@@ -26,7 +26,7 @@ namespace mfcc {
 
     void applyFirFilter(float* samples, int num_samples);
 
-    void applyFirFilterSeries(float* samples, int num_samples)
+    void applyFirFilterSeries(float* samples, int num_samples);
 
     float firFilter(float sample);
 

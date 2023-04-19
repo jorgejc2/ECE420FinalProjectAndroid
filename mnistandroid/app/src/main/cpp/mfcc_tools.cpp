@@ -3,6 +3,7 @@
 //
 
 #include "mfcc_tools.h"
+#include <cassert>
 
 using namespace std;
 
@@ -17,7 +18,7 @@ namespace mfcc {
     void int16ToFloat(const int16_t* original_samples, float* new_samples, int num_samples) {
         for (int i = 0; i < num_samples; i++)
 //            new_samples[i] = float((original_samples[i]>>2)/(32768.0));
-        new_samples[i] = float(original_samples[i]/32768.0);
+            new_samples[i] = float(original_samples[i]/32768.0);
     }
 
     /* MFCC algorithms */
@@ -40,7 +41,7 @@ namespace mfcc {
 
         /* initializing the numFilters x (nfft / 2 + 1) filter bank 2d array */
         int fbank_rows = numFilters;
-        int fbank_cols = nfft / 2 + 1;
+        int fbank_cols = int(nfft / 2 + 1);
         int fbank_size = fbank_rows * fbank_cols;
         float * curr_bank = new float[fbank_size];
 
@@ -49,7 +50,7 @@ namespace mfcc {
 
         /* lower and upper mel frequency bound */
         float low_freq = 0;
-        float high_freq = 2595.0 * log10f(1 + sampleRate/700.0);
+        float high_freq = 2595.0 * log10f(1.0 + ((sampleRate/2)/700.0));
 
         int num_bins = numFilters + 2;
 
@@ -60,8 +61,8 @@ namespace mfcc {
         float hz_point;
         for (int i = 0; i < num_bins; i++) {
             mel_point = i * mel_step;
-            hz_point = 700 * ( powf(10.0, mel_point / 2595.0) - 1 );
-            bins[i] = int( (nfft + 1) * hz_point / (sampleRate*2) );
+            hz_point = 700 * ( powf(10.0, mel_point / 2595.0) - 1.0 );
+            bins[i] = int( (nfft + 1) * hz_point / sampleRate );
         }
 
         int f_m_minus;
@@ -75,13 +76,21 @@ namespace mfcc {
             f_m_plus = bins[m + 1];
 
             /* in order to coalescence memory, I store the transpose of fbank */
+            float curr_val;
             for (int k = f_m_minus; k < f_m; k++) {
-                curr_bank_(m-1, k) = (2*(k - bins[m-1])) / (bins[m] - bins[m - 1]);
+                curr_val = (float)((2.0*(k - bins[m-1])) / (bins[m] - bins[m - 1]));
+                assert(curr_val >= 0);
+                curr_bank_(m-1, k) = curr_val;
             }
             for (int k = f_m; k < f_m_plus; k++) {
-                curr_bank_(m-1, k) = (2*(bins[m+1] - k)) / (bins[m + 1] - bins[m]);
+                curr_val = (float)((2.0*(bins[m+1] - k)) / (bins[m + 1] - bins[m]));
+                assert(curr_val >= 0);
+                curr_bank_(m-1, k) = curr_val;
             }
         }
+
+        for (int i = 0; i < fbank_size; i++)
+            curr_bank[i] = 1;
 
         *MelFilterArray = curr_bank;
 
@@ -96,7 +105,7 @@ namespace mfcc {
     int calculateDCTCoefficients(float** DCTArray, int melCoeffecients, int numFilters) {
         int dct_size = melCoeffecients * numFilters;
         float* curr_dct = new float[dct_size];
-        #define curr_dct_(i1, i0) curr_dct[i1 * numFilters + i0]
+        #define curr_dct_(i1, i0) curr_dct[(i1 * numFilters) + i0]
 
         /* fill in the dct array */
         for (int n = 0; n < melCoeffecients; n++) {
@@ -128,27 +137,31 @@ namespace mfcc {
      *          None
      */
     void gemmMultiplication (const float* in_1, const float* in_2, float* out, int m, int k, int n) {
-        #define in_1_(i1, i0) in_1[i1 * k + i0]
-        #define in_2_(i1, i0) in_2[i1 * n + i0]
-        #define out_(i1, i0) out[i1 * n + i0]
+//        #define in_1_(i1, i0) in_1[(i1 * k) + i0]
+//        #define in_2_(i1, i0) in_2[(i1 * n) + i0]
+//        #define out_(i1, i0) out[(i1 * n) + i0]
 
         /* iterate through input 1's rows (k) */
         for (int row = 0; row < m; row++) {
             /* iterate through input 2's columns (n) */
             for (int col = 0; col < n; col++) {
                 /* iterate through the shared dimension and calculate cell */
-                out_(row, col) = 0; // initialize
+//                out_(row, col) = 0.0; // initialize
+                out[row * n + col] = 0.0;
+                float sum = 0.0;
                 for (int i = 0; i < k; i++) {
-                    float result = in_1_(row, i) * in_2_(i, col);
+//                    float result = in_1_(row, i) * in_2_(i, col);
+                    sum += in_1[row * k + i] * in_2[i*n + col];
 //                    out_(row, col) += (std::isinf(result) || std::isnan(result)) ? 0 : result;
-                    out_(row, col) += result;
+//                    out_(row, col) += result;
                 }
+                out[row *n + col] = sum;
             }
         }
 
-        #undef in_1_
-        #undef in_2_
-        #undef out_
+//        #undef in_1_
+//        #undef in_2_
+//        #undef out_
     };
 
     int downsample(float* samples, float** new_samples, int num_samples, int original_sampling_rate, int new_sampling_rate) {
@@ -185,14 +198,14 @@ namespace mfcc {
         float circBuf_[N_TAPS] = {};
         int circBufIdx_ = 0;
 
-        int sum;
+        float sum;
         for (int i = 0; i < num_samples; i++) {
             circBuf_[circBufIdx_] = samples[i];
 
-            sum = 0;
+            sum = 0.0;
 
             for (int n = 0; n < N_TAPS; n++) {
-                sum += fir_coefficients[i] * circBuf_[(((circBufIdx_ - i) % N_TAPS) + N_TAPS) % N_TAPS];
+                sum += fir_coefficients[n] * circBuf_[(((circBufIdx_ - n) % N_TAPS) + N_TAPS) % N_TAPS];
             }
 
             samples[i] = sum;
