@@ -425,7 +425,8 @@ int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int
     mfcc::int16ToFloat(samples, f_samples, num_samples);
 
     /* apply FIR filter */
-    mfcc::applyFirFilter(f_samples, num_samples);
+//    mfcc::applyFirFilter(f_samples, num_samples);
+    mfcc::applyFirFilterSeries(f_samples, num_samples);
 
     /* downsample */
     float* down_sampled_sig;

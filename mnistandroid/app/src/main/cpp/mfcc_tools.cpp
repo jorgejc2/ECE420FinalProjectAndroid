@@ -16,7 +16,8 @@ namespace mfcc {
 
     void int16ToFloat(const int16_t* original_samples, float* new_samples, int num_samples) {
         for (int i = 0; i < num_samples; i++)
-            new_samples[i] = float((original_samples[i]>>2)/(32768.0));
+//            new_samples[i] = float((original_samples[i]>>2)/(32768.0));
+        new_samples[i] = float(original_samples[i]/32768.0);
     }
 
     /* MFCC algorithms */
@@ -153,7 +154,7 @@ namespace mfcc {
     int downsample(float* samples, float** new_samples, int num_samples, int original_sampling_rate, int new_sampling_rate) {
 
         /* calculate the factor by which we have to down sample based on the original and new sampling rate */
-        int down_sampling_factor = original_sampling_rate / new_sampling_rate;
+        int down_sampling_factor = original_sampling_rate / new_sampling_rate; // based on our parameters, this should be 6
         int new_samples_size = num_samples / down_sampling_factor;
         float* new_samples_ = new float[new_samples_size];
 
@@ -176,6 +177,27 @@ namespace mfcc {
         }
         /* reset the global value used for the fir filter */
         resetFirCircBuf();
+
+        return;
+    }
+
+    void applyFirFilterSeries(float* samples, int num_samples) {
+        float circBuf_[N_TAPS] = {};
+        int circBufIdx_ = 0;
+
+        int sum;
+        for (int i = 0; i < num_samples; i++) {
+            circBuf_[circBufIdx_] = samples[i];
+
+            sum = 0;
+
+            for (int n = 0; n < N_TAPS; n++) {
+                sum += fir_coefficients[i] * circBuf_[(((circBufIdx_ - i) % N_TAPS) + N_TAPS) % N_TAPS];
+            }
+
+            samples[i] = sum;
+            circBufIdx_ = (circBufIdx_ + 1) % N_TAPS;
+        }
 
         return;
     }
