@@ -550,7 +550,11 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
     int final_output_size = nn_data_cols*nn_data_rows;
     float* final_output = new float[final_output_size];
 
-    /* trim the output to only take the first 48 frames, but later pitch detection will go here */
+    /* TODO
+     * Remove this later. The samples should have been trimmed beforehand by pitch detection.
+     * For now, this code is just taking the first 48 frames out of the entire
+     * computed MFCC calculation.
+    */
     for (int row = 0; row < nn_data_rows; row++) {
         for (int col = 0; col < nn_data_cols; col++) {
 //            final_output[row * nn_data_cols + col] = mfcc_output[(row+1) * mfcc_cols + col];

@@ -45,9 +45,6 @@ namespace mfcc {
         int fbank_size = fbank_rows * fbank_cols;
         float * curr_bank = new float[fbank_size];
 
-        /* bank holding the mel filter banks */
-        #define curr_bank_(i1, i0) curr_bank[(i1*fbank_cols) + i0]
-
         /* lower and upper mel frequency bound */
         float low_freq = 0;
         float high_freq = 2595.0 * log10f(1.0 + ((sampleRate/2)/700.0));
@@ -80,22 +77,18 @@ namespace mfcc {
             for (int k = f_m_minus; k < f_m; k++) {
                 curr_val = (float)((2.0*(k - bins[m-1])) / (bins[m] - bins[m - 1]));
                 assert(curr_val >= 0);
-//                curr_bank_(m-1, k) = curr_val;
-                curr_bank[(m-1)*(nfft/2+1) + k] = curr_val;
+                curr_bank[(m-1)*fbank_cols + k] = curr_val;
             }
             for (int k = f_m; k < f_m_plus; k++) {
                 curr_val = (float)((2.0*(bins[m+1] - k)) / (bins[m + 1] - bins[m]));
                 assert(curr_val >= 0);
-//                curr_bank_(m-1, k) = curr_val;
-                curr_bank[(m-1)*(nfft/2+1) + k] = curr_val;
+                curr_bank[(m-1)*fbank_cols + k] = curr_val;
             }
         }
 
         *MelFilterArray = curr_bank;
 
         return fbank_size;
-
-        #undef curr_bank_
     };
 
     /*
@@ -104,12 +97,10 @@ namespace mfcc {
     int calculateDCTCoefficients(float** DCTArray, int melCoeffecients, int numFilters) {
         int dct_size = melCoeffecients * numFilters;
         float* curr_dct = new float[dct_size];
-//        #define curr_dct_(i1, i0) curr_dct[(i1 * numFilters) + i0]
 
         /* fill in the dct array */
         for (int n = 0; n < melCoeffecients; n++) {
             for (int m = 0; m < numFilters; m++) {
-//                curr_dct_(n, m) = cosf((M_PI * n * (m-0.5)) / numFilters);
                 curr_dct[n * numFilters + m] = cos((M_PI * n * (m-0.5)) / numFilters);
             }
         }
@@ -118,8 +109,6 @@ namespace mfcc {
         *DCTArray = curr_dct;
 
         return dct_size;
-
-//        #undef curr_dct_
     };
 
     /*
