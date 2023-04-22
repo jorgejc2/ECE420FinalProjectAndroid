@@ -59,13 +59,20 @@
     <TextView
         android:id="@+id/tfRes"
         android:layout_width="match_parent"
-        android:layout_height="150dp"
+        android:layout_height="82dp"
         android:paddingLeft="10dp"
         android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <TextView
+        android:id="@+id/tfliteResults"
+        android:layout_width="386dp"
+        android:layout_height="78dp"
+        android:text="TextView" />
 
     <TextView
         android:id="@+id/statusView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/init_status" />
+
 </LinearLayout>
