@@ -504,6 +504,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                         float temp;
                         for (int row = 0; row < 12; row++) {
                             for (int col = 0; col < 48; col++) {
+                                /* need to cut out NaN since it destroys CNN result */
                                 temp = mfcc_output[row * 48 + col];
                                 inputArray[0][row][col][0] = Float.isNaN(temp) ? 0 : temp;
                             }
@@ -512,16 +513,15 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
                     tflite.run(inputArray, outputArray);
 
-                    /* sort labels and outputs */
-
+                    /* flatten output probabilities */
                     float [] flat_outputArray = outputArray[0];
-
+                    /* sort from least to greatest */
                     float [] sorted_outputArray = mergeSort(flat_outputArray);
 
+                    /* get the top 3 probabilities */
                     int first_label = 0;
                     int second_label = 0;
                     int third_label = 0;
-
                     for (int i = 0; i < 10; i++) {
                         if (flat_outputArray[i] == sorted_outputArray[9]) {
                             first_label = i;
@@ -534,22 +534,12 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                         }
                     }
 
-//                    int predictedClass = -1;
-//                    float maxProb = -1;
-//                    for (int i = 0; i < 10; i++) {
-//                        if (outputArray[0][i] > maxProb) {
-//                            predictedClass = i;
-//                            maxProb = outputArray[0][i];
-//                        }
-//                    }
-
                     /* display the resultson the UI */
                     String tfres = String.format("1) Predicted Label: %d, Prob: %f\n" +
                             "2) Predicted Label: %d, Prob: %f\n" +
                             "3) Predicted Label: %d, Prob: %f\n", first_label, flat_outputArray[first_label],
                             second_label, flat_outputArray[second_label], third_label, flat_outputArray[third_label]);
                     tfliteResultText.setText(tfres);
-
                 }
 
             }.start();
@@ -837,8 +827,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                 retArr[0] = values[0];
                 return retArr;
             }
-
-            if (values[0] < values [1]) {
+            else if (values[0] < values [1]) {
                 retArr[0] = values[0];
                 retArr[1] = values[1];
                 return retArr;
