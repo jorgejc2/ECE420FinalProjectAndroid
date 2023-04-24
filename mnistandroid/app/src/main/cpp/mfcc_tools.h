@@ -12,6 +12,8 @@ using namespace std;
 
 namespace mfcc {
 
+    void createImage(float* samples, uint32_t* image_out, int pixel_width, int pixel_height, int samples_rows, int samples_cols);
+
     void int16ToFloat(const int16_t* original_samples, float* new_samples, int num_samples);
 
     void floatToInt16(const float* original_samples, int16_t* new_samples, int num_samples);

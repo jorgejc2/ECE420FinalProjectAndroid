@@ -15,6 +15,80 @@ int circBufIdx = 0;
 
 namespace mfcc {
 
+    void createImage(float* samples, uint32_t* image_out, int pixel_width, int pixel_height, int samples_rows, int samples_cols) {
+        const int viridis_size = 20;
+        int num_samples = samples_rows * samples_cols;
+        uint32_t viridis_palette [viridis_size] = {
+                0x440154,
+                0x481567,
+                0x482677,
+                0x453771,
+                0x404788,
+                0x39568C,
+                0x33638D,
+                0x2D708E,
+                0x287D8E,
+                0x238A8D,
+                0x1F968B,
+                0x20A387,
+                0x29AF7F,
+                0x3CBB75,
+                0x55C667,
+                0x73D055,
+                0x95D840,
+                0xB8DE29,
+                0xDCE319,
+                0xFDE725
+        };
+
+        /* normalize the data */
+        float* normalized_samples = new float[num_samples];
+        for (int i = 0; i < num_samples; i++)
+            normalized_samples[i] = samples[i];
+        normalizeData(normalized_samples, num_samples);
+
+        /* fill in canvas based on linearly normalized samples */
+        int horizontal_step = pixel_width / samples_cols;
+        int vertical_step = pixel_height / samples_rows;
+        int horizontal_count = 1;
+        int vertical_count = 1;
+        int x_idx, y_idx, viridis_idx;
+//        uint32_t r, g, b;
+//        uint32_t mask = 0x000011;
+
+        float percent;
+        for (int pixel_row = 0; pixel_row < pixel_height; pixel_row++) {
+            if (pixel_row >= vertical_count * vertical_step && vertical_count < samples_rows)
+                vertical_count++;
+
+            horizontal_count = 1;
+            for (int pixel_col =  0; pixel_col < pixel_width; pixel_col++) {
+                if (pixel_col >= horizontal_count * horizontal_step && horizontal_count < samples_cols)
+                    horizontal_count++;
+
+                x_idx = horizontal_count - 1;
+                y_idx = samples_rows - vertical_count;
+
+                percent = normalized_samples[y_idx * samples_cols + x_idx];
+
+                if (percent > 1)
+                    percent = 1;
+                if (percent < 0)
+                    percent = 0;
+
+                viridis_idx = (viridis_size - 1) * percent;
+//                b = mask & viridis_palette[viridis_idx];
+//                g = mask & (viridis_palette[viridis_idx] >> 8);
+//                r = mask & (viridis_palette[viridis_idx] >> 16);
+
+                image_out[pixel_row * pixel_width + pixel_col] = viridis_palette[viridis_idx];
+            }
+        }
+
+        /* free normalized samples */
+        delete [] normalized_samples;
+    }
+
     void int16ToFloat(const int16_t* original_samples, float* new_samples, int num_samples) {
         for (int i = 0; i < num_samples; i++)
 //            new_samples[i] = float((original_samples[i]>>2)/(32768.0));
