@@ -21,6 +21,41 @@ namespace mfcc {
             new_samples[i] = float(original_samples[i]/32768.0);
     }
 
+    void floatToInt16(const float* original_samples, int16_t* new_samples, int num_samples) {
+        for (int i = 0; i < num_samples; i++)
+            new_samples[i] = int16_t(original_samples[i] * 32768.0);
+    }
+
+    /* normalizes samples between 0 and 1 */
+    void normalizeData(float* samples, int num_samples) {
+        float max_val = std::numeric_limits<float>::min();
+        float min_val = std::numeric_limits<float>::max();
+
+        /* find the min and max values from the audio clip */
+        float curr_sample;
+        for (int i = 0; i < num_samples; i++) {
+            curr_sample = samples[i];
+            if (std::isnan(curr_sample)) {
+                curr_sample = 0;
+                samples[i] = 0;
+            }
+            if (curr_sample > max_val)
+                max_val = curr_sample;
+            if (curr_sample < min_val)
+                min_val = curr_sample;
+        }
+
+        /* adjust max_val */
+        max_val -= min_val;
+
+        /* normalize between 0 and 1 */
+        for (int i = 0; i < num_samples; i++) {
+            samples[i] = (samples[i] - min_val) / max_val;
+        }
+
+        return;
+    }
+
     /* MFCC algorithms */
     void preemphasis(float* samples, int num_samples, float b) {
 

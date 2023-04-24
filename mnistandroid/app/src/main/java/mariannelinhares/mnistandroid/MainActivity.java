@@ -145,7 +145,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
     /* tensorflow lite private variables */
     private Interpreter tflite = null;
-    final int use_dummy = 1;
+    final int use_dummy = 0;
 
     private double [] row1 = {17.954090056507162, 17.134420202199646, 18.82351505056716, 12.691770218557354, 16.47000472864695, 2.569986051352495, 2.611463290654575, -1.9272728635974279, -1.8062854858962114, -2.3772770884794645, -1.5846625592097099, 0.32049544476559333, 0.13082579852031592, -0.5955630726663632, -0.05708389621138675, 0.6306620146210697, 3.412809426428865, 9.651002038442387, 9.865285253436921, 11.872856246604671, 13.976273861364328, 12.791892374504416, 13.008364322510426, 17.630537069931304, 17.073059293494595, 14.625866497920976, -13.789432947964187, -9.930444010563154, -14.889156230726073, -15.40412695470952, -16.647555969250938, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     private double [] row2 = {1.5539615353624774, 3.7481556366959747, 2.610512879371151, -3.292260182329394, -0.8338261349616629, 0.11621704804074261, 6.056830133924504, 5.599254307594642, 6.66324438783517, 8.148450693685328, 8.627886503344987, 8.908196290483184, 9.582802129319262, 14.086574674302557, 15.357921236226689, 17.761045037182686, 20.526029157436, 24.002706509351082, 21.192010735831104, 18.295057977357057, 17.601636967983328, 12.60070924634285, 8.943322958141943, 7.27721504140753, 5.675638479803613, 5.848071146062688, 2.91747039963101, 4.0208103560328405, 5.10752570388466, 2.80319751137566, 1.0111087673049268, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -463,18 +463,41 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                     buffer.rewind();
                     /* get size to allocate for new buffer and perform mfcc */
                     int [] mfcc_dim = getRowAndCol();
+                    int [] mfcc_params = getMFCCParams();
                     int mfcc_rows = mfcc_dim[0];
                     int mfcc_cols = mfcc_dim[1];
                     int mfcc_output_size = mfcc_cols * mfcc_rows;
                     float [] mfcc_output = new float[mfcc_output_size];
-                    performMFCC(buffer, mfcc_output);
 
-                    currentTime = Calendar.getInstance().getTime();
+                    /* find out size of trimmed output */
+                    /*
+                     * Params:
+                     * 0 -- mfcc_rows
+                     * 1 -- mfcc_cols
+                     * 2 -- nfft
+                     * 3 -- nfilt
+                     * 4 -- noverlap
+                     * 5 -- num_ceps
+                     * 6 -- downsampled_fs
+                     */
+                    int nfft = mfcc_params[2];
+                    int noverlap = mfcc_params[4];
+                    if (noverlap < 0)
+                        noverlap = nfft / 2;
+                    int step = nfft - noverlap;
+                    int trimmed_size = mfcc_cols * step;
+                    short [] trimmed_output = new short[trimmed_size];
+
+                    performMFCC(buffer, mfcc_output, trimmed_output);
+
+                    rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_trimmedsamples.csv");
+                    writeSamplesToCSVFromShortArray(rootPath, trimmed_output);
+
                     rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_processed.csv");
                     writeSamplesToCSVFromFloatArray(rootPath, mfcc_output, mfcc_output_size);
 
                     // Prepare input data
-                    float[][][][] inputArray = new float[1][12][48][1]; // Assuming your input is a 1D array
+                    float[][][][] inputArray = new float[1][mfcc_rows][mfcc_cols][1]; // Assuming your input is a 1D array
                     float[][] outputArray = new float[1][10]; // Assuming you have a classification problem with NUM_CLASSES classes
 
 //                    /* loading dummy data */
@@ -502,10 +525,10 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                     }
                     else {
                         float temp;
-                        for (int row = 0; row < 12; row++) {
-                            for (int col = 0; col < 48; col++) {
+                        for (int row = 0; row < mfcc_rows; row++) {
+                            for (int col = 0; col < mfcc_cols; col++) {
                                 /* need to cut out NaN since it destroys CNN result */
-                                temp = mfcc_output[row * 48 + col];
+                                temp = mfcc_output[row * mfcc_cols + col];
                                 inputArray[0][row][col][0] = Float.isNaN(temp) ? 0 : temp;
                             }
                         }
@@ -888,7 +911,9 @@ public class MainActivity extends Activity implements View.OnClickListener, View
             public void run() {
                 try {
                     // Load the TFLite model file
-                    AssetFileDescriptor fileDescriptor = getAssets().openFd("my_model.tflite");
+//                    AssetFileDescriptor fileDescriptor = getAssets().openFd("my_model_12_48.tflite");
+//                    AssetFileDescriptor fileDescriptor = getAssets().openFd("my_model_12_28.tflite");
+                    AssetFileDescriptor fileDescriptor = getAssets().openFd("my_model_12_28_normalized.tflite");
                     FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
                     FileChannel fileChannel = inputStream.getChannel();
                     long startOffset = fileDescriptor.getStartOffset();
@@ -931,6 +956,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     public static native void resetParameters();
 
     /* function for doing mfcc */
-    public static native void performMFCC(ShortBuffer bufferPtr, float[] outputArray);
+    public static native void performMFCC(ShortBuffer bufferPtr, float[] outputArray, short[] trimmed_audio);
     public native int[] getRowAndCol();
+    public native int[] getMFCCParams();
 }

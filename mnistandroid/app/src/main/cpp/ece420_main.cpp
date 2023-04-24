@@ -22,15 +22,18 @@ Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jcl
 
 JNIEXPORT void JNICALL
     Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz,
-            jobject bufferPtr, jfloatArray outputArray);
+            jobject bufferPtr, jfloatArray outputArray, jshortArray trimmed_audio);
 
 JNIEXPORT jintArray JNICALL
     Java_mariannelinhares_mnistandroid_MainActivity_getRowAndCol(JNIEnv *env, jclass clazz);
+
+JNIEXPORT jintArray JNICALL
+    Java_mariannelinhares_mnistandroid_MainActivity_getMFCCParams(JNIEnv *env, jobject clazz);
 }
 
 // Student Variables
-#define EPOCH_PEAK_REGION_WIGGLE 30
-#define VOICED_THRESHOLD 200000000
+#define VOICED_THRESHOLD 20000000
+#define FRAME_SETBACK 2
 #define FRAME_SIZE 1024
 #define BUFFER_SIZE (3 * FRAME_SIZE)
 #define F_S 48000
@@ -42,8 +45,6 @@ int newEpochIdx = FRAME_SIZE;
 // processing a frame. Thread synchronization, etc. Setting to 300 is only an initializer.
 int FREQ_NEW_ANDROID = 300;
 int FREQ_NEW = 300;
-bool isWritingSamples = false; // to protect thread that waits for samples to be written
-float rawSamples[FRAME_SIZE] = {}; // holds raw samples to be copied over to front end
 
 const int threeSecondSampleSize = F_S * 3;
 int threeSecondSamples_idx = 0;
@@ -56,7 +57,7 @@ const int nfft = 256; // size of fft frames
 const int noverlap = -1; // -1 means to use the default overlap of 50%
 const int nfilt = 40; // number of filter banks to create
 const int num_ceps = 13; // number of cepstral coefficients to output
-const int nn_data_cols = 48; // number of frames to work with
+const int nn_data_cols = 28; // number of frames to work with
 //const int nn_data_cols = 1100;
 const int nn_data_rows = 12; // is always num_ceps - 1
 bool coeffecients_initialized = false;
@@ -67,85 +68,6 @@ float* DCTArray = nullptr;
 float hanning_window[nfft] = {};
 bool hanning_window_initialized = false;
 float window_scaling_factor = 0;
-
-
-bool lab5PitchShift(float *bufferIn_temp) {
-    // Lab 4 code is condensed into this function
-    int periodLen = detectBufferPeriod(bufferIn);
-    float freq = ((float) F_S) / periodLen;
-
-    // If voiced
-    if (periodLen > 0) {
-
-        LOGD("Frequency detected: %f\r\n", freq);
-
-        // Epoch detection - this code is written for you, but the principles will be quizzed
-        std::vector<int> epochLocations;
-        findEpochLocations(epochLocations, bufferIn, periodLen);
-
-        // In this section, you will implement the algorithm given in:
-        // https://courses.engr.illinois.edu/ece420/lab5/lab/#buffer-manipulation-algorithm
-        //
-        // Don't forget about the following functions! API given on the course page.
-        //
-        // getHanningCoef();
-        // findClosestInVector();
-        // overlapAndAdd();
-        // *********************** START YOUR CODE HERE  **************************** //
-
-        /* calculate new epoch spacing */
-        int new_epoch_spacing = F_S / FREQ_NEW;
-
-        /* incremement through new epochs based on spacing */
-        for (int i = newEpochIdx; i < 2 * FRAME_SIZE; i += new_epoch_spacing) {
-            /* can optimize this by keeping track of the last epoch we mapped to later */
-            int curr_epoch_idx = findClosestInVector(epochLocations, i, 0, epochLocations.size());
-            int curr_epoch = epochLocations[curr_epoch_idx];
-            /* boundary check and find left and right indices for calculating p0 */
-            int left_epoch;
-            int right_epoch;
-            if (curr_epoch_idx == 0)
-                left_epoch = 0;
-            else
-                left_epoch = epochLocations[curr_epoch_idx - 1];
-            if (curr_epoch_idx == epochLocations.size() - 1)
-                right_epoch = BUFFER_SIZE - 1;
-            else
-                right_epoch = epochLocations[curr_epoch_idx + 1];
-
-            /* calculate p0 */
-            int p0 = (right_epoch - left_epoch) / 2;
-
-            int window_len = 2*p0 + 1;
-            /* apply window to input centered around original epoch, and add it to output centered at new epoch */
-            for (int j = 0; j < window_len; j++) {
-                int windowed_idx = j; // index into window
-                int buffer_in_idx = (curr_epoch - p0) + j; // data to use centered around original epoch
-                int buffer_out_idx = (i - p0) + j; // location to add windowed data centered around new epoch
-                /* only sum overlapped data if indices are valid */
-                if ((buffer_out_idx < BUFFER_SIZE && buffer_out_idx > 0) && (buffer_in_idx < BUFFER_SIZE && buffer_in_idx > 0))
-                    bufferOut[buffer_out_idx] += getHanningCoef(window_len, windowed_idx) * bufferIn[buffer_in_idx];
-            }
-
-        }
-
-
-
-
-
-
-        // ************************ END YOUR CODE HERE  ***************************** //
-    }
-
-    // Final bookkeeping, move your new pointer back, because you'll be
-    // shifting everything back now in your circular buffer
-    newEpochIdx -= FRAME_SIZE;
-    if (newEpochIdx < FRAME_SIZE) {
-        newEpochIdx = FRAME_SIZE;
-    }
-
-    return (periodLen > 0);
-}
 
 void ece420ProcessFrame(sample_buf *dataBuf) {
     // Keep in mind, we only have 20ms to process each buffer!
@@ -162,41 +84,6 @@ void ece420ProcessFrame(sample_buf *dataBuf) {
         data[i] = ((uint16_t) dataBuf->buf_[2 * i]) | (((uint16_t) dataBuf->buf_[2 * i + 1]) << 8);
     }
 
-    /* not needed since this was for lab 5 so it wastes time
-
-//    // Shift our old data back to make room for the new data
-//    for (int i = 0; i < 2 * FRAME_SIZE; i++) {
-//        bufferIn[i] = bufferIn[i + FRAME_SIZE - 1];
-//    }
-//
-//    // Finally, put in our new data.
-//    for (int i = 0; i < FRAME_SIZE; i++) {
-//        bufferIn[i + 2 * FRAME_SIZE - 1] = (float) data[i];
-//    }
-//
-//    // The whole kit and kaboodle -- pitch shift
-//    bool isVoiced = lab5PitchShift(bufferIn);
-//
-//    if (isVoiced) {
-//        for (int i = 0; i < FRAME_SIZE; i++) {
-//            int16_t newVal = (int16_t) bufferOut[i];
-//
-//            uint8_t lowByte = (uint8_t) (0x00ff & newVal);
-//            uint8_t highByte = (uint8_t) ((0xff00 & newVal) >> 8);
-//            dataBuf->buf_[i * 2] = lowByte;
-//            dataBuf->buf_[i * 2 + 1] = highByte;
-//        }
-//    }
-//
-//    // Very last thing, update your output circular buffer!
-//    for (int i = 0; i < 2 * FRAME_SIZE; i++) {
-//        bufferOut[i] = bufferOut[i + FRAME_SIZE - 1];
-//    }
-//
-//    /* the 'past' buffer was perfectly reconstructed and sent, so we can shift it out */
-//    for (int i = 0; i < FRAME_SIZE; i++) {
-//        bufferOut[i + 2 * FRAME_SIZE - 1] = 0;
-//    }
     /* for our purposes, we need to save the samples to the front end */
 
     for (int i = 0; i < FRAME_SIZE; i++) {
@@ -212,128 +99,70 @@ void ece420ProcessFrame(sample_buf *dataBuf) {
     LOGD("Time delay: %ld us",  ((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)));
 }
 
-// Returns lag l that maximizes sum(x[n] x[n-k])
-int detectBufferPeriod(float *buffer) {
+int processFrame(int16_t* frame, int num_samples, int threshold) {
+    int isVoiced = 0;
 
-    float totalPower = 0;
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-        totalPower += buffer[i] * buffer[i];
+    int sum = 0;
+    for (int i = 0; i < num_samples; i++) {
+        sum += pow(abs(frame[i]),2);
     }
 
-    if (totalPower < VOICED_THRESHOLD) {
-        return -1;
-    }
+    if (sum > threshold)
+        isVoiced = 1;
 
-    // FFT is done using Kiss FFT engine. Remember to free(cfg) on completion
-    kiss_fft_cfg cfg = kiss_fft_alloc(BUFFER_SIZE, false, 0, 0);
-
-    kiss_fft_cpx buffer_in[BUFFER_SIZE];
-    kiss_fft_cpx buffer_fft[BUFFER_SIZE];
-
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-        buffer_in[i].r = bufferIn[i];
-        buffer_in[i].i = 0;
-    }
-
-    kiss_fft(cfg, buffer_in, buffer_fft);
-    free(cfg);
-
-
-    // Autocorrelation is given by:
-    // autoc = ifft(fft(x) * conj(fft(x))
-    //
-    // Also, (a + jb) (a - jb) = a^2 + b^2
-    kiss_fft_cfg cfg_ifft = kiss_fft_alloc(BUFFER_SIZE, true, 0, 0);
-
-    kiss_fft_cpx multiplied_fft[BUFFER_SIZE];
-    kiss_fft_cpx autoc_kiss[BUFFER_SIZE];
-
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-        multiplied_fft[i].r = (buffer_fft[i].r * buffer_fft[i].r)
-                              + (buffer_fft[i].i * buffer_fft[i].i);
-        multiplied_fft[i].i = 0;
-    }
-
-    kiss_fft(cfg_ifft, multiplied_fft, autoc_kiss);
-    free(cfg_ifft);
-
-    // Move to a normal float array rather than a struct array of r/i components
-    float autoc[BUFFER_SIZE];
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-        autoc[i] = autoc_kiss[i].r;
-    }
-
-    // We're only interested in pitches below 1000Hz.
-    // Why does this line guarantee we only identify pitches below 1000Hz?
-    int minIdx = F_S / 1000;
-    int maxIdx = BUFFER_SIZE / 2;
-
-    int periodLen = findMaxArrayIdx(autoc, minIdx, maxIdx);
-    float freq = ((float) F_S) / periodLen;
-
-    // TODO: tune
-    if (freq < 50) {
-        periodLen = -1;
-    }
-
-    return periodLen;
+    return isVoiced;
 }
 
+int trim_samples(float* samples, float** trimmed_samples, int num_samples, int frameSize, int nfft, int noverlap,  int threshold, int frame_setback) {
 
-void findEpochLocations(std::vector<int> &epochLocations, float *buffer, int periodLen) {
-    // This algorithm requires that the epoch locations be pretty well marked
+    /* calculate the number of frames and step size */
+    if (noverlap < 0)
+        noverlap = nfft / 2;
 
-    int largestPeak = findMaxArrayIdx(bufferIn, 0, BUFFER_SIZE);
-    epochLocations.push_back(largestPeak);
+    int step = nfft - noverlap;
 
-    // First go right
-    int epochCandidateIdx = epochLocations[0] + periodLen;
-    while (epochCandidateIdx < BUFFER_SIZE) {
-        epochLocations.push_back(epochCandidateIdx);
-        epochCandidateIdx += periodLen;
+    int numFrames = ceil(num_samples / step);
+
+    /* indicates if a frame was voiced or not */
+    while ((numFrames - 1)*step + (nfft - 1) >= num_samples)
+        numFrames--;
+
+    /* find the first frame that is voiced */
+    int16_t* frame = new int16_t[nfft];
+    int first_frame = 0;
+    int voiced;
+    for (int i = 0; i < numFrames; i++) {
+        mfcc::floatToInt16(&samples[i*step], frame, nfft);
+        voiced = processFrame(frame, nfft, threshold);
+        if (voiced > 0) {
+            first_frame = i;
+            break;
+        }
     }
 
-    // Then go left
-    epochCandidateIdx = epochLocations[0] - periodLen;
-    while (epochCandidateIdx > 0) {
-        epochLocations.push_back(epochCandidateIdx);
-        epochCandidateIdx -= periodLen;
+    delete [] frame;
+
+    /* include the setback and make sure it is in bounds */
+    first_frame -= frame_setback;
+    first_frame = first_frame < 0 ? 0 : first_frame; // make sure to set the first_frame in bounds
+
+    int last_frame = first_frame + frameSize; // exclusive
+    int trimmedSize = (last_frame * step) - (first_frame * step);
+    float* trimmed_samples_ = new float[trimmedSize];
+
+    int t_idx = 0; // idx in trimmed_samples_
+    for (int s_idx = first_frame*step; s_idx < last_frame*step; s_idx++) {
+        /* check if the index into the original samples array is out of bounds */
+        if (s_idx >= num_samples)
+            break;
+
+        trimmed_samples_[t_idx] = samples[s_idx];
+        t_idx++;
     }
 
-    // Sort in place so that we can more easily find the period,
-    // where period = (epochLocations[t+1] + epochLocations[t-1]) / 2
-    std::sort(epochLocations.begin(), epochLocations.end());
-
-    // Finally, just to make sure we have our epochs in the right
-    // place, ensure that every epoch mark (sans first/last) sits on a peak
-    for (int i = 1; i < epochLocations.size() - 1; i++) {
-        int minIdx = epochLocations[i] - EPOCH_PEAK_REGION_WIGGLE;
-        int maxIdx = epochLocations[i] + EPOCH_PEAK_REGION_WIGGLE;
-
-        int peakOffset = findMaxArrayIdx(bufferIn, minIdx, maxIdx) - minIdx;
-        peakOffset -= EPOCH_PEAK_REGION_WIGGLE;
-
-        epochLocations[i] += peakOffset;
-    }
-}
-
-void overlapAddArray(float *dest, float *src, int startIdx, int len) {
-    int idxLow = startIdx;
-    int idxHigh = startIdx + len;
-
-    int padLow = 0;
-    int padHigh = 0;
-    if (idxLow < 0) {
-        padLow = -idxLow;
-    }
-    if (idxHigh > BUFFER_SIZE) {
-        padHigh = BUFFER_SIZE - idxHigh;
-    }
-
-    // Finally, reconstruct the buffer
-    for (int i = padLow; i < len + padHigh; i++) {
-        dest[startIdx + i] += src[i];
-    }
+    /* redirect user pointer and return size of trimmed array */
+    *trimmed_samples = trimmed_samples_;
+    return trimmedSize;
 }
 
 void applyHanning(float* frame) {
@@ -425,30 +254,15 @@ int performSTFT(float *samples, float** frequencies, int num_samples, int sample
     return stft_output_size;
 }
 
-int performMFCC(int16_t* samples, float** mfcc_frequencies, int num_samples, int num_frames, float preemphasis_b, int &ret_rows, int &ret_cols) {
-
-    float* f_samples = new float[num_samples];
-
-    mfcc::int16ToFloat(samples, f_samples, num_samples);
-
-    /* apply FIR filter */
-    mfcc::applyFirFilterSeries(f_samples, num_samples);
-
-    /* downsample */
-    float* down_sampled_sig;
-    int down_sampled_sig_size = mfcc::downsample(f_samples, &down_sampled_sig, num_samples, fs, down_sampled_fs);
-
-    delete [] f_samples; // no longer needed
+int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, float preemphasis_b, int &ret_rows, int &ret_cols) {
 
     /* apply preemphasis filter */
-    mfcc::preemphasis(down_sampled_sig, down_sampled_sig_size, preemphasis_b);
+    mfcc::preemphasis(samples, num_samples, preemphasis_b);
 
     /* apply stft */
     float* stft_output = nullptr;
-    int stft_output_size = performSTFT(down_sampled_sig, &stft_output, down_sampled_sig_size, down_sampled_fs, true);
+    int stft_output_size = performSTFT(samples, &stft_output, num_samples, down_sampled_fs, true);
     int stft_num_frames = stft_output_size / int(nfft / 2 + 1);
-
-    delete [] down_sampled_sig; // no longer needed
 
     /* apply the mel filter banks */
     int mel_filtered_output_size = nfilt * stft_num_frames;
@@ -524,7 +338,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jcl
 }
 
 JNIEXPORT void JNICALL
-Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz, jobject bufferPtr, jfloatArray outputArray) {
+Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz, jobject bufferPtr, jfloatArray outputArray, jshortArray trimmed_audio) {
     // TODO: implement performMFCC()
 //    jfloat *buffer = (jfloat *) env->GetDirectBufferAddress(bufferPtr);
     /* typecasting should hopefully work since jfloat and float should be the same data struct */
@@ -537,38 +351,52 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
         coeffecients_initialized = true;
     }
 
-    /* DEBUG temporarily cutting out mfcc code */
-
     int buffer_size = 48000 * 3; // should be size of samples from recording
+
+    /* filter and downsample */
+    float* f_samples = new float[buffer_size];
+
+    mfcc::int16ToFloat(buffer, f_samples, buffer_size);
+
+    /* apply FIR filter */
+    mfcc::applyFirFilterSeries(f_samples, buffer_size);
+
+    /* downsample */
+    float* down_sampled_sig;
+    int down_sampled_sig_size = mfcc::downsample(f_samples, &down_sampled_sig, buffer_size, fs, down_sampled_fs);
+
+    delete [] f_samples; // no longer needed
+
+    /* calling trimming algorithm that is based on pitch detection */
+    float* trimmed_samples;
+    int trimmed_samples_size = trim_samples(down_sampled_sig, &trimmed_samples, down_sampled_sig_size, nn_data_cols, nfft, noverlap, VOICED_THRESHOLD, FRAME_SETBACK);
+
+    /* copy back the trimmed audio for debugging purposes */
+    int16_t* trimmed_samples_int16 = new int16_t[trimmed_samples_size];
+    mfcc::floatToInt16(trimmed_samples, trimmed_samples_int16, trimmed_samples_size);
+    env->SetShortArrayRegion(trimmed_audio, 0, trimmed_samples_size, trimmed_samples_int16);
+    delete [] trimmed_samples_int16;
 
     /* create array that will hold the final output */
     float* mfcc_output = nullptr;
     int mfcc_rows;
     int mfcc_cols;
-    performMFCC(buffer, &mfcc_output, buffer_size, nn_data_cols, 0.6, mfcc_rows, mfcc_cols);
+    performMFCC(trimmed_samples, &mfcc_output, trimmed_samples_size, 0.6, mfcc_rows, mfcc_cols);
 
     int final_output_size = nn_data_cols*nn_data_rows;
     float* final_output = new float[final_output_size];
 
-    /* TODO
-     * Remove this later. The samples should have been trimmed beforehand by pitch detection.
-     * For now, this code is just taking the first 48 frames out of the entire
-     * computed MFCC calculation.
-    */
+    /* return the computed mfcc output except the first row */
     for (int row = 0; row < nn_data_rows; row++) {
         for (int col = 0; col < nn_data_cols; col++) {
-//            final_output[row * nn_data_cols + col] = mfcc_output[(row+1) * mfcc_cols + col];
             final_output[row * nn_data_cols + col] = mfcc_output[(row+1) * mfcc_cols + col];
         }
     }
 
     delete [] mfcc_output;
 
-//    int fbank_col = nfilt;
-//    int fbank_row = int(nfft/2+1);
-//    int final_output_size = fbank_row * fbank_col;
-//    float* final_output = new float[final_output_size];
-//    mfcc::viewMelFilters(MelFilterArray, final_output, final_output_size);
+    /* normalize the final output between 0 and 1 */
+    mfcc::normalizeData(final_output, final_output_size);
 
     // Copy the final_output to the outputArray
     env->SetFloatArrayRegion(outputArray, 0, final_output_size, final_output);
@@ -589,3 +417,25 @@ Java_mariannelinhares_mnistandroid_MainActivity_getRowAndCol(JNIEnv *env, jclass
     env->SetIntArrayRegion(result, 0, 2, tempArray);
     return result;
 };
+
+JNIEXPORT jintArray JNICALL
+Java_mariannelinhares_mnistandroid_MainActivity_getMFCCParams(JNIEnv *env, jobject clazz) {
+    // TODO: implement getMFCCParams()
+    /*
+     * Params:
+     * mfcc_rows
+     * mfcc_cols
+     * nfft
+     * nfilt
+     * noverlap
+     * num_ceps
+     * downsampled_fs
+     */
+    jintArray result = env->NewIntArray(7);
+    if (result == nullptr)
+        return nullptr; // out of memory error
+
+    jint tempArray[] = {nn_data_rows, nn_data_cols, nfft, nfilt, noverlap, num_ceps, down_sampled_fs};
+    env->SetIntArrayRegion(result, 0, 7, tempArray);
+    return result;
+}
