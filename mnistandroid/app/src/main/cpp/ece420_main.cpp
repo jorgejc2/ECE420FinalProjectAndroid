@@ -22,7 +22,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jcl
 
 JNIEXPORT void JNICALL
     Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz,
-            jobject bufferPtr, jfloatArray outputArray, jshortArray trimmed_audio);
+            jobject bufferPtr, jfloatArray outputArray, jshortArray trimmed_audio, jintArray canvas);
 
 JNIEXPORT jintArray JNICALL
     Java_mariannelinhares_mnistandroid_MainActivity_getRowAndCol(JNIEnv *env, jclass clazz);
@@ -338,7 +338,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jcl
 }
 
 JNIEXPORT void JNICALL
-Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz, jobject bufferPtr, jfloatArray outputArray, jshortArray trimmed_audio) {
+Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz, jobject bufferPtr, jfloatArray outputArray, jshortArray trimmed_audio, jintArray canvas) {
     // TODO: implement performMFCC()
 //    jfloat *buffer = (jfloat *) env->GetDirectBufferAddress(bufferPtr);
     /* typecasting should hopefully work since jfloat and float should be the same data struct */
@@ -395,8 +395,15 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
 
     delete [] mfcc_output;
 
-    /* normalize the final output between 0 and 1 */
-    mfcc::normalizeData(final_output, final_output_size);
+//    /* normalize the final output between 0 and 1 */
+//    mfcc::normalizeData(final_output, final_output_size);
+
+    /* draw the mfcc to the canvas */
+    uint32_t* image = new uint32_t[400*300];
+    mfcc::createImage(final_output, image, 400, 300, nn_data_rows, nn_data_cols);
+
+    env->SetIntArrayRegion(canvas, 0, 400*300, (int*)image);
+    delete [] image;
 
     // Copy the final_output to the outputArray
     env->SetFloatArrayRegion(outputArray, 0, final_output_size, final_output);

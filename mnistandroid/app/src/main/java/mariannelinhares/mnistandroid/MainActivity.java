@@ -29,7 +29,10 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.PointF;
 //A mapping from String keys to various Parcelable values (interface for data container values, parcels)
 import android.graphics.Rect;
@@ -51,6 +54,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 //A user interface element that displays text to the user. To provide user-editable text, see EditText.
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 //Resizable-array implementation of the List interface. Implements all optional list operations, and permits all elements,
@@ -95,9 +99,9 @@ import org.tensorflow.lite.Tensor;
 
 
 /* added OnRequestPerm... which i believe opens dialogue to ask for speaker permission */
-public class MainActivity extends Activity implements View.OnClickListener, View.OnTouchListener,
-        ActivityCompat.OnRequestPermissionsResultCallback {
-//public class MainActivity extends Activity implements View.OnClickListener, View.OnTouchListener {
+//public class MainActivity extends Activity implements View.OnClickListener, View.OnTouchListener,
+//        ActivityCompat.OnRequestPermissionsResultCallback {
+    public class MainActivity extends Activity implements ActivityCompat.OnRequestPermissionsResultCallback {
 
     private static final int PIXEL_WIDTH = 28;
 
@@ -133,9 +137,14 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     private List<Classifier> mClassifiers = new ArrayList<>();
 
     // views
-    private DrawModel drawModel;
-    private DrawView drawView;
-    private PointF mTmpPiont = new PointF();
+//    private DrawModel drawModel;
+//    private DrawView drawView;
+//    private PointF mTmpPiont = new PointF();
+
+    ImageView mfccView;
+    Bitmap bitmap;
+    Canvas canvas;
+    Paint paint;
 
     private float mLastX;
     private float mLastY;
@@ -189,25 +198,33 @@ public class MainActivity extends Activity implements View.OnClickListener, View
 
         /**********************************************************************************************/
 
-        //get drawing view from XML (where the finger writes the number)
-        drawView = (DrawView) findViewById(R.id.draw);
-        //get the model object
-        drawModel = new DrawModel(PIXEL_WIDTH, PIXEL_WIDTH);
+        /* setting up mfcc imageview */
 
-        //init the view with the model object
-        drawView.setModel(drawModel);
-        // give it a touch listener to activate when the user taps
-        drawView.setOnTouchListener(this);
+        mfccView = (ImageView) this.findViewById(R.id.mfccView);
+        bitmap =  Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888);
+        canvas = new Canvas(bitmap);
+        canvas.drawColor(Color.BLACK);
+        mfccView.setImageBitmap(bitmap);
+
+//        //get drawing view from XML (where the finger writes the number)
+//        drawView = (DrawView) findViewById(R.id.draw);
+//        //get the model object
+//        drawModel = new DrawModel(PIXEL_WIDTH, PIXEL_WIDTH);
+//
+//        //init the view with the model object
+//        drawView.setModel(drawModel);
+//        // give it a touch listener to activate when the user taps
+//        drawView.setOnTouchListener(this);
 
         //clear button
         //clear the drawing when the user taps
         clearBtn = (Button) findViewById(R.id.btn_clear);
-        clearBtn.setOnClickListener(this);
+//        clearBtn.setOnClickListener(this);
 
         //class button
         //when tapped, this performs classification on the drawn image
         classBtn = (Button) findViewById(R.id.btn_class);
-        classBtn.setOnClickListener(this);
+//        classBtn.setOnClickListener(this);
 
         // res text
         //this is the text that shows the output of the classification
@@ -225,7 +242,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     //OnResume() is called when the user resumes his Activity which he left a while ago,
     // //say he presses home button and then comes back to app, onResume() is called.
     protected void onResume() {
-        drawView.onResume();
+//        drawView.onResume();
         super.onResume();
     }
 
@@ -233,7 +250,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     //OnPause() is called when the user receives an event like a call or a text message,
     // //when onPause() is called the Activity may be partially or completely hidden.
     protected void onPause() {
-        drawView.onPause();
+//        drawView.onPause();
         super.onPause();
     }
     //creates a model object in memory using the saved tensorflow protobuf model file
@@ -267,107 +284,107 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         }).start();
     }
 
-    @Override
-    public void onClick(View view) {
-        //when the user clicks something
-        if (view.getId() == R.id.btn_clear) {
-            //if its the clear button
-            //clear the drawing
-            drawModel.clear();
-            drawView.reset();
-            drawView.invalidate();
-            //empty the text view
-            resText.setText("");
-        } else if (view.getId() == R.id.btn_class) {
-            //if the user clicks the classify button
-            //get the pixel data and store it in an array
-            float pixels[] = drawView.getPixelData();
-
-            //init an empty string to fill with the classification output
-            String text = "";
-            //for each classifier in our array
-            for (Classifier classifier : mClassifiers) {
-                //perform classification on the image
-                final Classification res = classifier.recognize(pixels);
-                //if it can't classify, output a question mark
-                if (res.getLabel() == null) {
-                    text += classifier.name() + ": ?\n";
-                } else {
-                    //else output its name
-                    text += String.format("%s: %s, %f\n", classifier.name(), res.getLabel(),
-                            res.getConf());
-                }
-            }
-            resText.setText(text);
-        }
-    }
-
-    @Override
-    //this method detects which direction a user is moving
-    //their finger and draws a line accordingly in that
-    //direction
-    public boolean onTouch(View v, MotionEvent event) {
-        //get the action and store it as an int
-        int action = event.getAction() & MotionEvent.ACTION_MASK;
-        //actions have predefined ints, lets match
-        //to detect, if the user has touched, which direction the users finger is
-        //moving, and if they've stopped moving
-
-        //if touched
-        if (action == MotionEvent.ACTION_DOWN) {
-            //begin drawing line
-            processTouchDown(event);
-            return true;
-            //draw line in every direction the user moves
-        } else if (action == MotionEvent.ACTION_MOVE) {
-            processTouchMove(event);
-            return true;
-            //if finger is lifted, stop drawing
-        } else if (action == MotionEvent.ACTION_UP) {
-            processTouchUp();
-            return true;
-        }
-        return false;
-    }
-
-    //draw line down
-
-    private void processTouchDown(MotionEvent event) {
-        //calculate the x, y coordinates where the user has touched
-        mLastX = event.getX();
-        mLastY = event.getY();
-        //user them to calcualte the position
-        drawView.calcPos(mLastX, mLastY, mTmpPiont);
-        //store them in memory to draw a line between the
-        //difference in positions
-        float lastConvX = mTmpPiont.x;
-        float lastConvY = mTmpPiont.y;
-        //and begin the line drawing
-        drawModel.startLine(lastConvX, lastConvY);
-    }
-
-    //the main drawing function
-    //it actually stores all the drawing positions
-    //into the drawmodel object
-    //we actually render the drawing from that object
-    //in the drawrenderer class
-    private void processTouchMove(MotionEvent event) {
-        float x = event.getX();
-        float y = event.getY();
-
-        drawView.calcPos(x, y, mTmpPiont);
-        float newConvX = mTmpPiont.x;
-        float newConvY = mTmpPiont.y;
-        drawModel.addLineElem(newConvX, newConvY);
-
-        mLastX = x;
-        mLastY = y;
-        drawView.invalidate();
-    }
-
-    private void processTouchUp() {
-        drawModel.endLine();
-    }
+//    @Override
+//    public void onClick(View view) {
+//        //when the user clicks something
+//        if (view.getId() == R.id.btn_clear) {
+//            //if its the clear button
+//            //clear the drawing
+//            drawModel.clear();
+//            drawView.reset();
+//            drawView.invalidate();
+//            //empty the text view
+//            resText.setText("");
+//        } else if (view.getId() == R.id.btn_class) {
+//            //if the user clicks the classify button
+//            //get the pixel data and store it in an array
+//            float pixels[] = drawView.getPixelData();
+//
+//            //init an empty string to fill with the classification output
+//            String text = "";
+//            //for each classifier in our array
+//            for (Classifier classifier : mClassifiers) {
+//                //perform classification on the image
+//                final Classification res = classifier.recognize(pixels);
+//                //if it can't classify, output a question mark
+//                if (res.getLabel() == null) {
+//                    text += classifier.name() + ": ?\n";
+//                } else {
+//                    //else output its name
+//                    text += String.format("%s: %s, %f\n", classifier.name(), res.getLabel(),
+//                            res.getConf());
+//                }
+//            }
+//            resText.setText(text);
+//        }
+//    }
+//
+//    @Override
+//    //this method detects which direction a user is moving
+//    //their finger and draws a line accordingly in that
+//    //direction
+//    public boolean onTouch(View v, MotionEvent event) {
+//        //get the action and store it as an int
+//        int action = event.getAction() & MotionEvent.ACTION_MASK;
+//        //actions have predefined ints, lets match
+//        //to detect, if the user has touched, which direction the users finger is
+//        //moving, and if they've stopped moving
+//
+//        //if touched
+//        if (action == MotionEvent.ACTION_DOWN) {
+//            //begin drawing line
+//            processTouchDown(event);
+//            return true;
+//            //draw line in every direction the user moves
+//        } else if (action == MotionEvent.ACTION_MOVE) {
+//            processTouchMove(event);
+//            return true;
+//            //if finger is lifted, stop drawing
+//        } else if (action == MotionEvent.ACTION_UP) {
+//            processTouchUp();
+//            return true;
+//        }
+//        return false;
+//    }
+//
+//    //draw line down
+//
+//    private void processTouchDown(MotionEvent event) {
+//        //calculate the x, y coordinates where the user has touched
+//        mLastX = event.getX();
+//        mLastY = event.getY();
+//        //user them to calcualte the position
+//        drawView.calcPos(mLastX, mLastY, mTmpPiont);
+//        //store them in memory to draw a line between the
+//        //difference in positions
+//        float lastConvX = mTmpPiont.x;
+//        float lastConvY = mTmpPiont.y;
+//        //and begin the line drawing
+//        drawModel.startLine(lastConvX, lastConvY);
+//    }
+//
+//    //the main drawing function
+//    //it actually stores all the drawing positions
+//    //into the drawmodel object
+//    //we actually render the drawing from that object
+//    //in the drawrenderer class
+//    private void processTouchMove(MotionEvent event) {
+//        float x = event.getX();
+//        float y = event.getY();
+//
+//        drawView.calcPos(x, y, mTmpPiont);
+//        float newConvX = mTmpPiont.x;
+//        float newConvY = mTmpPiont.y;
+//        drawModel.addLineElem(newConvX, newConvY);
+//
+//        mLastX = x;
+//        mLastY = y;
+//        drawView.invalidate();
+//    }
+//
+//    private void processTouchUp() {
+//        drawModel.endLine();
+//    }
 
     /**********************************************************************************************/
     /**                                 LAB 5 METHODS                                            **/
@@ -468,6 +485,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                     int mfcc_cols = mfcc_dim[1];
                     int mfcc_output_size = mfcc_cols * mfcc_rows;
                     float [] mfcc_output = new float[mfcc_output_size];
+                    int [] mfcc_canvas = new int[400*300];
 
                     /* find out size of trimmed output */
                     /*
@@ -488,13 +506,19 @@ public class MainActivity extends Activity implements View.OnClickListener, View
                     int trimmed_size = mfcc_cols * step;
                     short [] trimmed_output = new short[trimmed_size];
 
-                    performMFCC(buffer, mfcc_output, trimmed_output);
+                    performMFCC(buffer, mfcc_output, trimmed_output, mfcc_canvas);
 
+                    /* save results to csv files */
                     rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_trimmedsamples.csv");
                     writeSamplesToCSVFromShortArray(rootPath, trimmed_output);
 
                     rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_processed.csv");
                     writeSamplesToCSVFromFloatArray(rootPath, mfcc_output, mfcc_output_size);
+
+                    /* draw to the canvas */
+                    bitmap = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888);
+                    bitmap.copyPixelsFromBuffer(makeBuffer(mfcc_canvas, mfcc_canvas.length));
+                    mfccView.setImageBitmap(bitmap);
 
                     // Prepare input data
                     float[][][][] inputArray = new float[1][mfcc_rows][mfcc_cols][1]; // Assuming your input is a 1D array
@@ -930,6 +954,18 @@ public class MainActivity extends Activity implements View.OnClickListener, View
         }).start();
     }
 
+    /* for drawing to the imageView */
+    private IntBuffer makeBuffer(int[] src, int n) {
+        IntBuffer dst = ByteBuffer.allocateDirect(n * 4)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .asIntBuffer();
+        for (int i = 0; i < n; i++) {
+            dst.put(src[i]);
+        }
+        dst.rewind();
+        return dst;
+    }
+
     /*
      * Loading our Libs
      */
@@ -956,7 +992,7 @@ public class MainActivity extends Activity implements View.OnClickListener, View
     public static native void resetParameters();
 
     /* function for doing mfcc */
-    public static native void performMFCC(ShortBuffer bufferPtr, float[] outputArray, short[] trimmed_audio);
+    public static native void performMFCC(ShortBuffer bufferPtr, float[] outputArray, short[] trimmed_audio, int [] canvas);
     public native int[] getRowAndCol();
     public native int[] getMFCCParams();
 }

@@ -10,11 +10,12 @@
     android:paddingBottom="@dimen/activity_vertical_margin"
     tools:context="mariannelinhares.mnistandroid.MainActivity">
 
-    <mariannelinhares.mnistandroid.views.DrawView
-        android:id="@+id/draw"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
+    <ImageView
+        android:id="@+id/mfccView"
+        android:layout_width="380dp"
+        android:layout_height="330dp"
+        android:layout_centerVertical="true"
+        android:scaleType="fitXY" />
 
     <LinearLayout
         android:layout_width="match_parent"

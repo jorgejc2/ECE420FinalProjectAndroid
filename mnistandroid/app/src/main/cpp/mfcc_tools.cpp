@@ -18,7 +18,7 @@ namespace mfcc {
     void createImage(float* samples, uint32_t* image_out, int pixel_width, int pixel_height, int samples_rows, int samples_cols) {
         const int viridis_size = 20;
         int num_samples = samples_rows * samples_cols;
-        uint32_t viridis_palette [viridis_size] = {
+        uint32_t viridis_palette[viridis_size] = {
                 0x440154,
                 0x481567,
                 0x482677,
@@ -42,9 +42,21 @@ namespace mfcc {
         };
 
         /* normalize the data */
-        float* normalized_samples = new float[num_samples];
-        for (int i = 0; i < num_samples; i++)
-            normalized_samples[i] = samples[i];
+        float *normalized_samples = new float[num_samples];
+        int num_above_10 = 0;
+        int num_below_neg_10 = 0;
+        for (int i = 0; i < num_samples; i++) {
+            if (samples[i] > 10) {
+                normalized_samples[i] = 10;
+                num_above_10++;
+            }
+            else if (samples[i] < -10) {
+                normalized_samples[i] = -10;
+                num_below_neg_10++;
+            }
+            else
+                normalized_samples[i] = samples[i];
+            }
         normalizeData(normalized_samples, num_samples);
 
         /* fill in canvas based on linearly normalized samples */
@@ -53,8 +65,8 @@ namespace mfcc {
         int horizontal_count = 1;
         int vertical_count = 1;
         int x_idx, y_idx, viridis_idx;
-//        uint32_t r, g, b;
-//        uint32_t mask = 0x000011;
+        uint32_t r, g, b;
+        uint32_t mask = 0x0000FF;
 
         float percent;
         for (int pixel_row = 0; pixel_row < pixel_height; pixel_row++) {
@@ -77,11 +89,11 @@ namespace mfcc {
                     percent = 0;
 
                 viridis_idx = (viridis_size - 1) * percent;
-//                b = mask & viridis_palette[viridis_idx];
-//                g = mask & (viridis_palette[viridis_idx] >> 8);
-//                r = mask & (viridis_palette[viridis_idx] >> 16);
+                b = mask & viridis_palette[viridis_idx];
+                g = mask & (viridis_palette[viridis_idx] >> 8);
+                r = mask & (viridis_palette[viridis_idx] >> 16);
 
-                image_out[pixel_row * pixel_width + pixel_col] = viridis_palette[viridis_idx];
+                image_out[pixel_row * pixel_width + pixel_col] = (0xFF << 24) | (b << 16) | (g << 8) | r;
             }
         }
 
