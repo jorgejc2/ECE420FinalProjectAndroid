@@ -335,13 +335,15 @@ JNIEXPORT void JNICALL
 Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jclass clazz) {
     // TODO: implement resetParameters()
     threeSecondSamples_idx = 0;
+    for (int i = 0; i < threeSecondSampleSize; i++) {
+        threeSecondSamples[i] = 0;
+    }
 }
 
 JNIEXPORT void JNICALL
 Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz, jobject bufferPtr, jfloatArray outputArray, jshortArray trimmed_audio, jintArray canvas) {
     // TODO: implement performMFCC()
-//    jfloat *buffer = (jfloat *) env->GetDirectBufferAddress(bufferPtr);
-    /* typecasting should hopefully work since jfloat and float should be the same data struct */
+
     int16_t * buffer = (jshort *) env->GetDirectBufferAddress(bufferPtr);
 
     /* Initialize DCT and MelFilter arrays if not initialized */

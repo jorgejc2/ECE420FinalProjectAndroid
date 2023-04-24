@@ -10,64 +10,78 @@
     android:paddingBottom="@dimen/activity_vertical_margin"
     tools:context="mariannelinhares.mnistandroid.MainActivity">
 
-    <ImageView
-        android:id="@+id/mfccView"
-        android:layout_width="380dp"
-        android:layout_height="330dp"
-        android:layout_centerVertical="true"
-        android:scaleType="fitXY" />
-
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:weightSum="5"
+        android:orientation="vertical">
 
-        <Button
-            android:id="@+id/btn_clear"
-            android:layout_width="wrap_content"
+        <ImageView
+            android:id="@+id/mfccView"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Clear" />
+            android:layout_centerVertical="true"
+            android:layout_weight="3"
+            android:scaleType="fitXY" />
 
-        <Button
-            android:id="@+id/btn_class"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Detect" />
-
-        <Button
-            android:id="@+id/capture_control_button"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:onClick="onEchoClick"
-            android:text="Start" />
+            android:orientation="horizontal">
 
-        <Button
-            android:id="@+id/get_parameter_button"
-            android:layout_width="wrap_content"
+            <Button
+                android:id="@+id/btn_clear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Clear" />
+
+            <Button
+                android:id="@+id/btn_class"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Detect" />
+
+            <Button
+                android:id="@+id/capture_control_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onEchoClick"
+                android:text="Start" />
+
+            <Button
+                android:id="@+id/get_parameter_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="getLowLatencyParameters"
+                android:text="Param" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:onClick="getLowLatencyParameters"
-            android:text="Param" />
+            android:orientation="vertical"
+            android:layout_weight="1">
+            <TextView
+                android:id="@+id/tfRes"
+                android:layout_width="match_parent"
+                android:layout_height="82dp"
+                android:paddingLeft="10dp"
+                android:textAppearance="?android:attr/textAppearanceMedium" />
+
+            <TextView
+                android:id="@+id/tfliteResults"
+                android:layout_width="386dp"
+                android:layout_height="78dp"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/statusView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/init_status" />
+        </LinearLayout>
+
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/tfRes"
-        android:layout_width="match_parent"
-        android:layout_height="82dp"
-        android:paddingLeft="10dp"
-        android:textAppearance="?android:attr/textAppearanceMedium" />
-
-    <TextView
-        android:id="@+id/tfliteResults"
-        android:layout_width="386dp"
-        android:layout_height="78dp"
-        android:text="" />
-
-    <TextView
-        android:id="@+id/statusView"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/init_status" />
 
 </LinearLayout>

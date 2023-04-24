@@ -44,6 +44,7 @@ import android.os.Bundle;
 //Object used to report movement (mouse, pen, finger, trackball) events.
 // //Motion events may hold either absolute or relative movements and other data, depending on the type of device.
 import android.os.Handler;
+import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.view.MotionEvent;
@@ -60,6 +61,7 @@ import android.widget.Toast;
 //Resizable-array implementation of the List interface. Implements all optional list operations, and permits all elements,
 // including null. In addition to implementing the List interface, this class provides methods to
 // //manipulate the size of the array that is used internally to store the list.
+import java.io.OutputStream;
 import java.nio.IntBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.ShortBuffer;
@@ -150,7 +152,10 @@ import org.tensorflow.lite.Tensor;
     private float mLastY;
 
     private static final String FILENAME = "data.txt";
-    private static final String DNAME = "/sdcard/data/audio/"; //  "myfiles";
+    private static final String RAW_AUDIO = "/sdcard/data/raw_samples/";
+    private static final String PROCESSED_AUDIO = "/sdcard/data/processed_samples/";
+    private static final String MFCC_IMAGES = "/sdcard/data/mfcc_images/";
+    private static final String TRIMMED_AUDIO = "/sdcard/data/trimmed_samples/";
 
     /* tensorflow lite private variables */
     private Interpreter tflite = null;
@@ -471,7 +476,7 @@ import org.tensorflow.lite.Tensor;
                     buffer.rewind();
 
                     Date currentTime = Calendar.getInstance().getTime();
-                    File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_rawsamples.csv");
+                    File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + RAW_AUDIO, currentTime + "_rawsamples.csv");
                     writeSamplesToCSVFromShortArray(rootPath, audio_samples);
 
                     /* reset parameters for the 3 second buffer in the C++ end */
@@ -509,16 +514,30 @@ import org.tensorflow.lite.Tensor;
                     performMFCC(buffer, mfcc_output, trimmed_output, mfcc_canvas);
 
                     /* save results to csv files */
-                    rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_trimmedsamples.csv");
+                    rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + TRIMMED_AUDIO, currentTime + "_trimmedsamples.csv");
                     writeSamplesToCSVFromShortArray(rootPath, trimmed_output);
 
-                    rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, currentTime + "_processed.csv");
+                    rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + PROCESSED_AUDIO, currentTime + "_processed.csv");
                     writeSamplesToCSVFromFloatArray(rootPath, mfcc_output, mfcc_output_size);
 
                     /* draw to the canvas */
                     bitmap = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888);
                     bitmap.copyPixelsFromBuffer(makeBuffer(mfcc_canvas, mfcc_canvas.length));
                     mfccView.setImageBitmap(bitmap);
+
+                    OutputStream stream = null;
+                    try {
+                        stream = new FileOutputStream(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + MFCC_IMAGES + currentTime + "_mfcc.png");
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                    /* Write bitmap to file using JPEG or PNG and 80% quality hint for JPEG. */
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
+                    try {
+                        stream.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
 
                     // Prepare input data
                     float[][][][] inputArray = new float[1][mfcc_rows][mfcc_cols][1]; // Assuming your input is a 1D array
@@ -760,9 +779,6 @@ import org.tensorflow.lite.Tensor;
 
         // The callback runs on app's thread, so we are safe to resume the action
         startEcho();
-
-        File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, FILENAME);
-        writeTextData(rootPath, "Hello world");
     }
 
     private void writeTextData(File file, String data) {
