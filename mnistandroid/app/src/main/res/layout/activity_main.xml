@@ -31,9 +31,10 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/btn_clear"
+                android:id="@+id/btn_trimmed"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:onClick="playTrimmedAudio"
                 android:text="Trimmed" />
 
             <Button

@@ -136,13 +136,15 @@ import org.tensorflow.lite.Tensor;
 
     /* wav audio private variables */
     private String last_raw_audio = "";
+    private String last_trimmed_audio = "";
     private byte[] raw_wav_file;
+    private byte[] trimmed_wav_file;
 
     /**********************************************************************************************/
 
 
     // ui elements
-    private Button clearBtn, replayBtn;
+    private Button trimmedBtn, replayBtn;
     private TextView resText;
     private TextView tfliteResultText;
     private List<Classifier> mClassifiers = new ArrayList<>();
@@ -163,9 +165,11 @@ import org.tensorflow.lite.Tensor;
     private static final String FILENAME = "data.txt";
     private static final String RAW_AUDIO = "/sdcard/data/raw_samples/";
     private static final String PROCESSED_AUDIO = "/sdcard/data/processed_samples/";
+    private static final String TRIMMED_AUDIO = "/sdcard/data/trimmed_samples/";
     private static final String MFCC_IMAGES = "/sdcard/data/mfcc_images/";
     private static final String RAW_WAV_AUDIO = "/sdcard/data/raw_wav_audio/";
-    private static final String TRIMMED_AUDIO = "/sdcard/data/trimmed_samples/";
+    private static final String TRIMMED_WAV_AUDIO = "/sdcard/data/trimmed_wav_audio/";
+
 
     /* tensorflow lite private variables */
     private Interpreter tflite = null;
@@ -233,7 +237,8 @@ import org.tensorflow.lite.Tensor;
 
         //clear button
         //clear the drawing when the user taps
-        clearBtn = (Button) findViewById(R.id.btn_clear);
+        trimmedBtn = (Button) findViewById(R.id.btn_trimmed);
+        trimmedBtn.setEnabled(false);
 
         //class button
         //when tapped, this performs classification on the drawn image
@@ -514,6 +519,7 @@ import org.tensorflow.lite.Tensor;
                      */
                     int nfft = mfcc_params[2];
                     int noverlap = mfcc_params[4];
+                    int downsampled_fs = mfcc_params[6];
                     if (noverlap < 0)
                         noverlap = nfft / 2;
                     int step = nfft - noverlap;
@@ -552,6 +558,41 @@ import org.tensorflow.lite.Tensor;
 
                     /* now that we have at least one wav file saved, we can enable the replay button */
                     replayBtn.setEnabled(true);
+
+                    /* now save the trimmed audio */
+                    int trimmed_wav_file_bytes = 44 + trimmed_output.length * 2;
+                    trimmed_wav_file = new byte[trimmed_wav_file_bytes];
+                    ShortBuffer trimmed_output_buffer = ByteBuffer.allocateDirect(trimmed_output.length * 2)
+                            .order(ByteOrder.LITTLE_ENDIAN)
+                            .asShortBuffer();
+                    for (int i = 0; i < trimmed_output.length; i++)
+                        trimmed_output_buffer.put(trimmed_output[i]);
+                    trimmed_output_buffer.rewind();
+                    createWavFile(trimmed_output_buffer, trimmed_output.length, downsampled_fs, trimmed_wav_file);
+
+                    /* write trimmed wav file */
+                    fos = null;
+                    try {
+                        last_trimmed_audio = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + TRIMMED_WAV_AUDIO + currentTime + "_trimmed_audio.wav";
+                        fos = new FileOutputStream(last_trimmed_audio);
+                        fos.write(trimmed_wav_file, 0, trimmed_wav_file.length);
+                        fos.close();
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    try {
+                        if(fos != null)
+                            fos.close();
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    /* end write trimmed wav file */
+                    /* now that we have at least one trimmed wav file saved, we can enable the replay button */
+                    trimmedBtn.setEnabled(true);
 
                     /* save results to csv files */
                     rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + TRIMMED_AUDIO, currentTime + "_trimmedsamples.csv");
@@ -663,13 +704,45 @@ import org.tensorflow.lite.Tensor;
                 R.string.StopEcho: R.string.StartEcho));
     }
 
-    public void replayLastAudio(View view) {
-        AssetManager am = getAssets();
+    public void playTrimmedAudio(View view) {
+
         MediaPlayer player;
         try {
-            if (last_raw_audio == "")
-                    return;
-//            AssetFileDescriptor _afd = am.openFd(last_raw_audio);
+            /* disable audio buttons */
+            replayBtn.setEnabled(false);
+            trimmedBtn.setEnabled(false);
+            FileInputStream fis = new FileInputStream(last_trimmed_audio);
+            FileDescriptor afd = fis.getFD();
+            player = new MediaPlayer();
+            player.setDataSource(afd);
+            player.prepare();
+            player.start();
+            player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+
+                @Override
+                public void onCompletion(MediaPlayer mp) {
+                    // TODO Auto-generated method stub
+                    mp.release();
+                    /* reenable audio buttons */
+                    replayBtn.setEnabled(true);
+                    trimmedBtn.setEnabled(true);
+                }
+
+            });
+            player.setLooping(false);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
+    public void replayLastAudio(View view) {
+
+        MediaPlayer player;
+        try {
+            /* disable audio buttons */
+            replayBtn.setEnabled(false);
+            trimmedBtn.setEnabled(false);
             FileInputStream fis = new FileInputStream(last_raw_audio);
             FileDescriptor afd = fis.getFD();
             player = new MediaPlayer();
@@ -682,6 +755,9 @@ import org.tensorflow.lite.Tensor;
                 public void onCompletion(MediaPlayer mp) {
                     // TODO Auto-generated method stub
                     mp.release();
+                    /* reenable audio buttons */
+                    replayBtn.setEnabled(true);
+                    trimmedBtn.setEnabled(true);
                 }
 
             });
@@ -768,8 +844,6 @@ import org.tensorflow.lite.Tensor;
                     EXTERNAL_STORAGE_REQUEST);
         }
 
-//        File rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + DNAME, FILENAME);
-//        writeTextData(rootPath, "Hello world");
         return;
 
     }
