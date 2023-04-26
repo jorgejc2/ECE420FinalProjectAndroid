@@ -142,7 +142,7 @@ import org.tensorflow.lite.Tensor;
 
 
     // ui elements
-    private Button clearBtn, classBtn;
+    private Button clearBtn, replayBtn;
     private TextView resText;
     private TextView tfliteResultText;
     private List<Classifier> mClassifiers = new ArrayList<>();
@@ -234,12 +234,11 @@ import org.tensorflow.lite.Tensor;
         //clear button
         //clear the drawing when the user taps
         clearBtn = (Button) findViewById(R.id.btn_clear);
-//        clearBtn.setOnClickListener(this);
 
         //class button
         //when tapped, this performs classification on the drawn image
-        classBtn = (Button) findViewById(R.id.btn_class);
-//        classBtn.setOnClickListener(this);
+        replayBtn = (Button) findViewById(R.id.btn_replay);
+        replayBtn.setEnabled(false);
 
         // res text
         //this is the text that shows the output of the classification
@@ -551,6 +550,9 @@ import org.tensorflow.lite.Tensor;
                     }
                     /* end write raw wav file */
 
+                    /* now that we have at least one wav file saved, we can enable the replay button */
+                    replayBtn.setEnabled(true);
+
                     /* save results to csv files */
                     rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + TRIMMED_AUDIO, currentTime + "_trimmedsamples.csv");
                     writeSamplesToCSVFromShortArray(rootPath, trimmed_output);
@@ -671,15 +673,7 @@ import org.tensorflow.lite.Tensor;
             FileInputStream fis = new FileInputStream(last_raw_audio);
             FileDescriptor afd = fis.getFD();
             player = new MediaPlayer();
-//            MediaDataSource wav_audio = null;
-//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-//                wav_audio.readAt(0, raw_wav_file, 0, 48000*3*2);
-//            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-//                player.setDataSource(wav_audio);
-                player.setDataSource(afd, 0,
-                        44 + 48000*3*2);
-            }
+            player.setDataSource(afd);
             player.prepare();
             player.start();
             player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
