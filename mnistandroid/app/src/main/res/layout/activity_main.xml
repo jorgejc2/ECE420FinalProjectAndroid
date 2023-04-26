@@ -40,7 +40,8 @@
                 android:id="@+id/btn_class"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Detect" />
+                android:onClick="replayLastAudio"
+                android:text="Replay" />
 
             <Button
                 android:id="@+id/capture_control_button"

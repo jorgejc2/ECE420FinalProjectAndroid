@@ -29,6 +29,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.AssetFileDescriptor;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -39,7 +40,10 @@ import android.graphics.Rect;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioRecord;
+import android.media.MediaDataSource;
+import android.media.MediaPlayer;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 //Object used to report movement (mouse, pen, finger, trackball) events.
 // //Motion events may hold either absolute or relative movements and other data, depending on the type of device.
@@ -61,6 +65,7 @@ import android.widget.Toast;
 //Resizable-array implementation of the List interface. Implements all optional list operations, and permits all elements,
 // including null. In addition to implementing the List interface, this class provides methods to
 // //manipulate the size of the array that is used internally to store the list.
+import java.io.FileDescriptor;
 import java.io.OutputStream;
 import java.nio.IntBuffer;
 import java.nio.MappedByteBuffer;
@@ -128,6 +133,10 @@ import org.tensorflow.lite.Tensor;
     private int audio_samples_idx = 0;
     private Timer timer;
     private int recording_duration = 0; // duration of recording in ms, should end at 30,000 ms
+
+    /* wav audio private variables */
+    private String last_raw_audio = "";
+    private byte[] raw_wav_file;
 
     /**********************************************************************************************/
 
@@ -517,13 +526,14 @@ import org.tensorflow.lite.Tensor;
                     /* save the raw audio and trimmed audio as wav files */
                     buffer.rewind();
                     int raw_wav_file_bytes = 44 + (48000*3*2);
-                    byte[] raw_wav_file = new byte[raw_wav_file_bytes];
+                    raw_wav_file = new byte[raw_wav_file_bytes];
                     createWavFile(buffer, buffer.capacity(), 48000, raw_wav_file);
 
                     /* write raw wav file */
                     FileOutputStream fos = null;
                     try {
-                        fos = new FileOutputStream(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + RAW_WAV_AUDIO + currentTime + "_raw_audio.wav");
+                        last_raw_audio = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + RAW_WAV_AUDIO + currentTime + "_raw_audio.wav";
+                        fos = new FileOutputStream(last_raw_audio);
                         fos.write(raw_wav_file, 0, raw_wav_file.length);
                         fos.close();
                     } catch (FileNotFoundException e) {
@@ -649,6 +659,43 @@ import org.tensorflow.lite.Tensor;
         isPlaying = !isPlaying;
         controlButton.setText(getString((isPlaying == true) ?
                 R.string.StopEcho: R.string.StartEcho));
+    }
+
+    public void replayLastAudio(View view) {
+        AssetManager am = getAssets();
+        MediaPlayer player;
+        try {
+            if (last_raw_audio == "")
+                    return;
+//            AssetFileDescriptor _afd = am.openFd(last_raw_audio);
+            FileInputStream fis = new FileInputStream(last_raw_audio);
+            FileDescriptor afd = fis.getFD();
+            player = new MediaPlayer();
+//            MediaDataSource wav_audio = null;
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//                wav_audio.readAt(0, raw_wav_file, 0, 48000*3*2);
+//            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//                player.setDataSource(wav_audio);
+                player.setDataSource(afd, 0,
+                        44 + 48000*3*2);
+            }
+            player.prepare();
+            player.start();
+            player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+
+                @Override
+                public void onCompletion(MediaPlayer mp) {
+                    // TODO Auto-generated method stub
+                    mp.release();
+                }
+
+            });
+            player.setLooping(false);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     /*
