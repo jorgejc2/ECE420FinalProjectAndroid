@@ -13,7 +13,88 @@ const float fir_coefficients [N_TAPS] = {-0.0009154526549517794, -0.001111454257
 float circBuf[N_TAPS] = {};
 int circBufIdx = 0;
 
+typedef struct  WAV_HEADER
+{
+    /* RIFF Chunk Descriptor */
+    uint8_t         RIFF[4];        // RIFF Header Magic header
+    uint32_t        ChunkSize;      // RIFF Chunk Size
+    uint8_t         WAVE[4];        // WAVE Header
+    /* "fmt" sub-chunk */
+    uint8_t         fmt[4];         // FMT header
+    uint32_t        Subchunk1Size;  // Size of the fmt chunk
+    uint16_t        AudioFormat;    // Audio format 1=PCM,6=mulaw,7=alaw,     257=IBM Mu-Law, 258=IBM A-Law, 259=ADPCM
+    uint16_t        NumOfChan;      // Number of channels 1=Mono 2=Sterio
+    uint32_t        SamplesPerSec;  // Sampling Frequency in Hz
+    uint32_t        bytesPerSec;    // bytes per second
+    uint16_t        blockAlign;     // 2=16-bit mono, 4=16-bit stereo
+    uint16_t        bitsPerSample;  // Number of bits per sample
+    /* "data" sub-chunk */
+    uint8_t         Subchunk2ID[4]; // "data"  string
+    uint32_t        Subchunk2Size;  // Sampled data length
+} wav_hdr;
+
 namespace mfcc {
+
+    int createWav(int16_t* samples, uint8_t** wavFile, int num_samples, int sample_rate) {
+        /* setting up header */
+
+        int wavFileSize = sizeof(wav_hdr) + (num_samples * 2);
+        uint8_t* wavFile_ = new uint8_t[wavFileSize];
+
+        wav_hdr wav_header;
+        wav_header.RIFF[0] = 'R';
+        wav_header.RIFF[1] = 'I';
+        wav_header.RIFF[2] = 'F';
+        wav_header.RIFF[3] = 'F';
+
+        wav_header.WAVE[0] = 'W';
+        wav_header.WAVE[1] = 'A';
+        wav_header.WAVE[2] = 'V';
+        wav_header.WAVE[3] = 'E';
+
+        wav_header.fmt[0] = 'f';
+        wav_header.fmt[1] = 'm';
+        wav_header.fmt[2] = 't';
+        wav_header.fmt[3] = ' ';
+
+        wav_header.Subchunk1Size = 16; // 16 for PCM
+        wav_header.AudioFormat = 1; // 1 for PCM
+        wav_header.NumOfChan = 1; // 1 for mono
+        wav_header.SamplesPerSec = sample_rate;
+        wav_header.bitsPerSample = 16;
+        wav_header.bytesPerSec = (sample_rate * 1 * 16) / 8;
+        wav_header.blockAlign = 2; // 2 = 16 bit mono
+
+        wav_header.Subchunk2ID[0] = 'd';
+        wav_header.Subchunk2ID[1] = 'a';
+        wav_header.Subchunk2ID[2] = 't';
+        wav_header.Subchunk2ID[3] = 'a';
+        wav_header.Subchunk2Size = (num_samples * 1 * 16) / 8; // size of the data past the header in bytes
+
+        wav_header.ChunkSize = 36 + wav_header.Subchunk2Size; // size of entire file excluding ChunkID and ChunkSize (minus 8 bytes)
+
+        uint8_t* wav_header_byte = (uint8_t*)(&wav_header); // cast wav_header into byte format
+        /* copy over the header file */
+        for (int i = 0; i < sizeof(wav_hdr); i++) {
+            wavFile_[i] = wav_header_byte[i];
+        }
+
+        int start_idx = sizeof(wav_hdr); // starting index of where data will get copied to
+
+        /* note that data is stored as little endian */
+        int16_t mask = 0x00FF;
+        int wavFileIdx1, wavFileIdx2;
+        for (int i = 0; i < num_samples; i++) {
+            wavFileIdx1 =  start_idx + i * 2;
+            wavFileIdx2 = wavFileIdx1 + 1;
+            wavFile_[wavFileIdx1] = mask & samples[i];
+            wavFile_[wavFileIdx2] = mask & (samples[i] >> 8);
+        }
+
+        *wavFile = wavFile_;
+
+        return wavFileSize;
+    }
 
     void createImage(float* samples, uint32_t* image_out, int pixel_width, int pixel_height, int samples_rows, int samples_cols) {
         const int viridis_size = 20;

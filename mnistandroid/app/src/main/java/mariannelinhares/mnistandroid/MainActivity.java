@@ -155,6 +155,7 @@ import org.tensorflow.lite.Tensor;
     private static final String RAW_AUDIO = "/sdcard/data/raw_samples/";
     private static final String PROCESSED_AUDIO = "/sdcard/data/processed_samples/";
     private static final String MFCC_IMAGES = "/sdcard/data/mfcc_images/";
+    private static final String RAW_WAV_AUDIO = "/sdcard/data/raw_wav_audio/";
     private static final String TRIMMED_AUDIO = "/sdcard/data/trimmed_samples/";
 
     /* tensorflow lite private variables */
@@ -512,6 +513,33 @@ import org.tensorflow.lite.Tensor;
                     short [] trimmed_output = new short[trimmed_size];
 
                     performMFCC(buffer, mfcc_output, trimmed_output, mfcc_canvas);
+
+                    /* save the raw audio and trimmed audio as wav files */
+                    buffer.rewind();
+                    int raw_wav_file_bytes = 44 + (48000*3*2);
+                    byte[] raw_wav_file = new byte[raw_wav_file_bytes];
+                    createWavFile(buffer, buffer.capacity(), 48000, raw_wav_file);
+
+                    /* write raw wav file */
+                    FileOutputStream fos = null;
+                    try {
+                        fos = new FileOutputStream(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + RAW_WAV_AUDIO + currentTime + "_raw_audio.wav");
+                        fos.write(raw_wav_file, 0, raw_wav_file.length);
+                        fos.close();
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    try {
+                        if(fos != null)
+                            fos.close();
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    /* end write raw wav file */
 
                     /* save results to csv files */
                     rootPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + TRIMMED_AUDIO, currentTime + "_trimmedsamples.csv");
@@ -1009,6 +1037,7 @@ import org.tensorflow.lite.Tensor;
 
     /* function for doing mfcc */
     public static native void performMFCC(ShortBuffer bufferPtr, float[] outputArray, short[] trimmed_audio, int [] canvas);
+    public static native void createWavFile(ShortBuffer bufferPtr, int num_samples, int sample_rate, byte[] wavFile);
     public native int[] getRowAndCol();
     public native int[] getMFCCParams();
 }

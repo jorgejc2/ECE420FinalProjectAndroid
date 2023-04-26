@@ -29,6 +29,11 @@ JNIEXPORT jintArray JNICALL
 
 JNIEXPORT jintArray JNICALL
     Java_mariannelinhares_mnistandroid_MainActivity_getMFCCParams(JNIEnv *env, jobject clazz);
+
+JNIEXPORT void JNICALL
+Java_mariannelinhares_mnistandroid_MainActivity_createWavFile(JNIEnv *env, jclass clazz,
+                                                              jobject buffer_ptr, jint num_samples, jint sample_rate,
+                                                              jbyteArray wav_file);
 }
 
 // Student Variables
@@ -58,6 +63,7 @@ const int noverlap = -1; // -1 means to use the default overlap of 50%
 const int nfilt = 40; // number of filter banks to create
 const int num_ceps = 13; // number of cepstral coefficients to output
 const int nn_data_cols = 28; // number of frames to work with
+const float preemphasis_b = 0.97;
 //const int nn_data_cols = 1100;
 const int nn_data_rows = 12; // is always num_ceps - 1
 bool coeffecients_initialized = false;
@@ -293,6 +299,7 @@ int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, float
     /* take log base 10 of output before applying DCT */
     for (int i = 0; i < mel_filtered_output_size; i++) {
         float temp = mel_filtered_output[i];
+        temp = (temp == 0.0) ? std::numeric_limits<float>::epsilon() : temp;
         mel_filtered_output[i] = log10(temp);
     }
 
@@ -383,7 +390,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
     float* mfcc_output = nullptr;
     int mfcc_rows;
     int mfcc_cols;
-    performMFCC(trimmed_samples, &mfcc_output, trimmed_samples_size, 0.6, mfcc_rows, mfcc_cols);
+    performMFCC(trimmed_samples, &mfcc_output, trimmed_samples_size, preemphasis_b, mfcc_rows, mfcc_cols);
 
     int final_output_size = nn_data_cols*nn_data_rows;
     float* final_output = new float[final_output_size];
@@ -447,4 +454,23 @@ Java_mariannelinhares_mnistandroid_MainActivity_getMFCCParams(JNIEnv *env, jobje
     jint tempArray[] = {nn_data_rows, nn_data_cols, nfft, nfilt, noverlap, num_ceps, down_sampled_fs};
     env->SetIntArrayRegion(result, 0, 7, tempArray);
     return result;
+}
+
+JNIEXPORT void JNICALL
+Java_mariannelinhares_mnistandroid_MainActivity_createWavFile(JNIEnv *env, jclass clazz,
+                                                              jobject buffer_ptr, jint num_samples, jint sample_rate,
+                                                              jbyteArray wav_file) {
+    // TODO: implement createWavFile()
+    /* grabbing pointer to audio samples */
+    int16_t * buffer = (jshort *) env->GetDirectBufferAddress(buffer_ptr);
+
+    uint8_t* wav_file_ = nullptr;
+    int wav_file_size = mfcc::createWav(buffer, &wav_file_, num_samples, sample_rate);
+
+    /* casting wav_file_ to signed byte but should not make a difference */
+    env->SetByteArrayRegion(wav_file, 0, wav_file_size, (int8_t *)wav_file_);
+
+    delete [] wav_file_;
+
+    return;
 }
