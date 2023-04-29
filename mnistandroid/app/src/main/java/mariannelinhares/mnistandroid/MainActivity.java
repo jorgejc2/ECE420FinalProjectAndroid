@@ -217,6 +217,20 @@ import org.tensorflow.lite.Tensor;
 
         /**********************************************************************************************/
 
+        /* create directories if they did not exist before */
+        File directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + RAW_AUDIO);
+        directory.mkdirs();
+        directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + PROCESSED_AUDIO);
+        directory.mkdirs();
+        directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + TRIMMED_AUDIO);
+        directory.mkdirs();
+        directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + MFCC_IMAGES);
+        directory.mkdirs();
+        directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + RAW_WAV_AUDIO);
+        directory.mkdirs();
+        directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + TRIMMED_WAV_AUDIO);
+        directory.mkdirs();
+
         /* setting up mfcc imageview */
 
         mfccView = (ImageView) this.findViewById(R.id.mfccView);
@@ -302,108 +316,6 @@ import org.tensorflow.lite.Tensor;
             }
         }).start();
     }
-
-//    @Override
-//    public void onClick(View view) {
-//        //when the user clicks something
-//        if (view.getId() == R.id.btn_clear) {
-//            //if its the clear button
-//            //clear the drawing
-//            drawModel.clear();
-//            drawView.reset();
-//            drawView.invalidate();
-//            //empty the text view
-//            resText.setText("");
-//        } else if (view.getId() == R.id.btn_class) {
-//            //if the user clicks the classify button
-//            //get the pixel data and store it in an array
-//            float pixels[] = drawView.getPixelData();
-//
-//            //init an empty string to fill with the classification output
-//            String text = "";
-//            //for each classifier in our array
-//            for (Classifier classifier : mClassifiers) {
-//                //perform classification on the image
-//                final Classification res = classifier.recognize(pixels);
-//                //if it can't classify, output a question mark
-//                if (res.getLabel() == null) {
-//                    text += classifier.name() + ": ?\n";
-//                } else {
-//                    //else output its name
-//                    text += String.format("%s: %s, %f\n", classifier.name(), res.getLabel(),
-//                            res.getConf());
-//                }
-//            }
-//            resText.setText(text);
-//        }
-//    }
-//
-//    @Override
-//    //this method detects which direction a user is moving
-//    //their finger and draws a line accordingly in that
-//    //direction
-//    public boolean onTouch(View v, MotionEvent event) {
-//        //get the action and store it as an int
-//        int action = event.getAction() & MotionEvent.ACTION_MASK;
-//        //actions have predefined ints, lets match
-//        //to detect, if the user has touched, which direction the users finger is
-//        //moving, and if they've stopped moving
-//
-//        //if touched
-//        if (action == MotionEvent.ACTION_DOWN) {
-//            //begin drawing line
-//            processTouchDown(event);
-//            return true;
-//            //draw line in every direction the user moves
-//        } else if (action == MotionEvent.ACTION_MOVE) {
-//            processTouchMove(event);
-//            return true;
-//            //if finger is lifted, stop drawing
-//        } else if (action == MotionEvent.ACTION_UP) {
-//            processTouchUp();
-//            return true;
-//        }
-//        return false;
-//    }
-//
-//    //draw line down
-//
-//    private void processTouchDown(MotionEvent event) {
-//        //calculate the x, y coordinates where the user has touched
-//        mLastX = event.getX();
-//        mLastY = event.getY();
-//        //user them to calcualte the position
-//        drawView.calcPos(mLastX, mLastY, mTmpPiont);
-//        //store them in memory to draw a line between the
-//        //difference in positions
-//        float lastConvX = mTmpPiont.x;
-//        float lastConvY = mTmpPiont.y;
-//        //and begin the line drawing
-//        drawModel.startLine(lastConvX, lastConvY);
-//    }
-//
-//    //the main drawing function
-//    //it actually stores all the drawing positions
-//    //into the drawmodel object
-//    //we actually render the drawing from that object
-//    //in the drawrenderer class
-//    private void processTouchMove(MotionEvent event) {
-//        float x = event.getX();
-//        float y = event.getY();
-//
-//        drawView.calcPos(x, y, mTmpPiont);
-//        float newConvX = mTmpPiont.x;
-//        float newConvY = mTmpPiont.y;
-//        drawModel.addLineElem(newConvX, newConvY);
-//
-//        mLastX = x;
-//        mLastY = y;
-//        drawView.invalidate();
-//    }
-//
-//    private void processTouchUp() {
-//        drawModel.endLine();
-//    }
 
     /**********************************************************************************************/
     /**                                 LAB 5 METHODS                                            **/
