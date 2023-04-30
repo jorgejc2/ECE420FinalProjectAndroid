@@ -428,6 +428,8 @@ import org.tensorflow.lite.Tensor;
                      * 4 -- noverlap
                      * 5 -- num_ceps
                      * 6 -- downsampled_fs
+                     * 7 -- step
+                     * 8 -- trimmed size
                      */
                     int nfft = mfcc_params[2];
                     int noverlap = mfcc_params[4];
@@ -435,7 +437,7 @@ import org.tensorflow.lite.Tensor;
                     if (noverlap < 0)
                         noverlap = nfft / 2;
                     int step = nfft - noverlap;
-                    int trimmed_size = mfcc_cols * step;
+                    int trimmed_size = mfcc_params[8];
                     short [] trimmed_output = new short[trimmed_size];
 
                     performMFCC(buffer, mfcc_output, trimmed_output, mfcc_canvas);

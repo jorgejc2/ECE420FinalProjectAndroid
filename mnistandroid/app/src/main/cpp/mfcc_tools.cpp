@@ -124,20 +124,9 @@ namespace mfcc {
 
         /* normalize the data */
         float *normalized_samples = new float[num_samples];
-        int num_above_10 = 0;
-        int num_below_neg_10 = 0;
         for (int i = 0; i < num_samples; i++) {
-            if (samples[i] > 10) {
-                normalized_samples[i] = 10;
-                num_above_10++;
-            }
-            else if (samples[i] < -10) {
-                normalized_samples[i] = -10;
-                num_below_neg_10++;
-            }
-            else
-                normalized_samples[i] = samples[i];
-            }
+            normalized_samples[i] = samples[i];
+        }
         normalizeData(normalized_samples, num_samples);
 
         /* fill in canvas based on linearly normalized samples */
@@ -180,6 +169,8 @@ namespace mfcc {
 
         /* free normalized samples */
         delete [] normalized_samples;
+
+        return;
     }
 
     void int16ToFloat(const int16_t* original_samples, float* new_samples, int num_samples) {

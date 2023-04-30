@@ -153,11 +153,11 @@ int trim_samples(float* samples, float** trimmed_samples, int num_samples, int f
     first_frame = first_frame < 0 ? 0 : first_frame; // make sure to set the first_frame in bounds
 
     int last_frame = first_frame + frameSize; // exclusive
-    int trimmedSize = (last_frame * step) - (first_frame * step);
+    int trimmedSize = (((last_frame-1) * step)+nfft) - (first_frame * step);
     float* trimmed_samples_ = new float[trimmedSize];
 
     int t_idx = 0; // idx in trimmed_samples_
-    for (int s_idx = first_frame*step; s_idx < last_frame*step; s_idx++) {
+    for (int s_idx = first_frame*step; s_idx < ((last_frame-1)*step)+nfft; s_idx++) {
         /* check if the index into the original samples array is out of bounds */
         if (s_idx >= num_samples)
             break;
@@ -237,8 +237,6 @@ int performSTFT(float *samples, float** frequencies, int num_samples, int sample
         float curr_val;
         if (oneSided) {
             for (int i = 0; i < int(nfft/2 + 1); i++) {
-//                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
-//                frequencies_[i * num_ffts + n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
                 curr_val = fabs((out[i].r * out[i].r) + (out[i].i * out[i].i));
                 assert(curr_val >= 0);
                 frequencies_[i * num_ffts + n] = curr_val;
@@ -246,7 +244,6 @@ int performSTFT(float *samples, float** frequencies, int num_samples, int sample
         }
         else {
             for (int i = 0; i < nfft; i++) {
-//                stft_result[i][n] = 10.0 * log10(2*(out[i].r*out[i].r + out[i].i*out[i].i)/(down_sampled_fs*window_scaling_factor));
                 curr_val = fabs((out[i].r * out[i].r) + (out[i].i * out[i].i));
                 assert(curr_val >= 0);
                 frequencies_[i * num_ffts + n] = curr_val;
@@ -274,25 +271,6 @@ int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, float
     int mel_filtered_output_size = nfilt * stft_num_frames;
     float* mel_filtered_output = new float[mel_filtered_output_size];
     mfcc::gemmMultiplication(MelFilterArray, stft_output, mel_filtered_output, nfilt, int(nfft / 2 + 1), stft_num_frames);
-
-    int mel_zeros = 0;
-    int mel_negs = 0;
-    int stft_zeros = 0;
-    int stft_negs = 0;
-
-    for (int i = 0; i < nfilt * (nfft/2+1); i++) {
-        if (MelFilterArray[i] == 0)
-            mel_zeros++;
-        if (MelFilterArray[i] < 0)
-            mel_negs++;
-    }
-
-    for (int i = 0; i < stft_output_size; i++) {
-        if (stft_output[i] == 0)
-            stft_zeros++;
-        if (stft_output[i] < 0)
-            stft_negs++;
-    }
 
     delete [] stft_output;
 
@@ -377,7 +355,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
     delete [] f_samples; // no longer needed
 
     /* calling trimming algorithm that is based on pitch detection */
-    float* trimmed_samples;
+    float* trimmed_samples = nullptr;
     int trimmed_samples_size = trim_samples(down_sampled_sig, &trimmed_samples, down_sampled_sig_size, nn_data_cols, nfft, noverlap, VOICED_THRESHOLD, FRAME_SETBACK);
 
     /* copy back the trimmed audio for debugging purposes */
@@ -392,6 +370,8 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
     int mfcc_cols;
     performMFCC(trimmed_samples, &mfcc_output, trimmed_samples_size, preemphasis_b, mfcc_rows, mfcc_cols);
 
+    delete [] trimmed_samples; // array is no longer needed
+
     int final_output_size = nn_data_cols*nn_data_rows;
     float* final_output = new float[final_output_size];
 
@@ -403,9 +383,6 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
     }
 
     delete [] mfcc_output;
-
-//    /* normalize the final output between 0 and 1 */
-//    mfcc::normalizeData(final_output, final_output_size);
 
     /* draw the mfcc to the canvas */
     uint32_t* image = new uint32_t[400*300];
@@ -446,13 +423,21 @@ Java_mariannelinhares_mnistandroid_MainActivity_getMFCCParams(JNIEnv *env, jobje
      * noverlap
      * num_ceps
      * downsampled_fs
+     * step
+     * trimmed size
      */
-    jintArray result = env->NewIntArray(7);
+    jintArray result = env->NewIntArray(9);
     if (result == nullptr)
         return nullptr; // out of memory error
 
-    jint tempArray[] = {nn_data_rows, nn_data_cols, nfft, nfilt, noverlap, num_ceps, down_sampled_fs};
-    env->SetIntArrayRegion(result, 0, 7, tempArray);
+    /* calculating the step size */
+    int step = nfft - noverlap;
+
+    /* calculating the size needed for an array holding the trimmed samples */
+    int trimmed_size = ((nn_data_cols-1) * step)+nfft;
+
+    jint tempArray[] = {nn_data_rows, nn_data_cols, nfft, nfilt, noverlap, num_ceps, down_sampled_fs, step, trimmed_size};
+    env->SetIntArrayRegion(result, 0, 9, tempArray);
     return result;
 }
 
