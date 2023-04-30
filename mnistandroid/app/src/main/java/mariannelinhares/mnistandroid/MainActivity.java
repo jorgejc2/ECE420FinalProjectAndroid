@@ -416,7 +416,13 @@ import org.tensorflow.lite.Tensor;
                     int mfcc_cols = mfcc_dim[1];
                     int mfcc_output_size = mfcc_cols * mfcc_rows;
                     float [] mfcc_output = new float[mfcc_output_size];
-                    int [] mfcc_canvas = new int[400*300];
+                    FloatBuffer mfcc_output_buffer = ByteBuffer.allocateDirect(mfcc_output_size * 4)
+                            .order(ByteOrder.LITTLE_ENDIAN)
+                            .asFloatBuffer();
+//                    int [] mfcc_canvas = new int[400*300];
+                    IntBuffer mfcc_canvas_buf = ByteBuffer.allocateDirect(400 * 300 * 4)
+                            .order(ByteOrder.LITTLE_ENDIAN)
+                            .asIntBuffer();
 
                     /* find out size of trimmed output */
                     /*
@@ -438,7 +444,18 @@ import org.tensorflow.lite.Tensor;
                     int trimmed_size = mfcc_cols * step;
                     short [] trimmed_output = new short[trimmed_size];
 
-                    performMFCC(buffer, mfcc_output, trimmed_output, mfcc_canvas);
+                    performMFCC(buffer, mfcc_output_buffer, trimmed_output, mfcc_canvas_buf);
+
+                    /* copy over the image into an array */
+                    int [] mfcc_canvas = new int [300*400];
+                    mfcc_canvas_buf.rewind();
+                    for (int i = 0; i < 300*400; i++) {
+                        mfcc_canvas[i] = mfcc_canvas_buf.get();
+                    }
+                    mfcc_output_buffer.rewind();
+                    for (int i = 0; i < mfcc_output_size; i++) {
+                        mfcc_output[i] = mfcc_output_buffer.get();
+                    }
 
                     /* save the raw audio and trimmed audio as wav files */
                     buffer.rewind();
@@ -515,7 +532,7 @@ import org.tensorflow.lite.Tensor;
 
                     /* draw to the canvas */
                     bitmap = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888);
-                    bitmap.copyPixelsFromBuffer(makeBuffer(mfcc_canvas, mfcc_canvas.length));
+                    bitmap.copyPixelsFromBuffer(makeBuffer(mfcc_canvas, 400*300));
                     mfccView.setImageBitmap(bitmap);
 
                     OutputStream stream = null;
@@ -1063,7 +1080,7 @@ import org.tensorflow.lite.Tensor;
     public static native void resetParameters();
 
     /* function for doing mfcc */
-    public static native void performMFCC(ShortBuffer bufferPtr, float[] outputArray, short[] trimmed_audio, int [] canvas);
+    public static native void performMFCC(ShortBuffer bufferPtr, FloatBuffer outputArrayPtr, short[] trimmed_audio, IntBuffer canvasPtr);
     public static native void createWavFile(ShortBuffer bufferPtr, int num_samples, int sample_rate, byte[] wavFile);
     public native int[] getRowAndCol();
     public native int[] getMFCCParams();

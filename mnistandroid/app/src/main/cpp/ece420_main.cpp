@@ -22,7 +22,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jcl
 
 JNIEXPORT void JNICALL
     Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz,
-            jobject bufferPtr, jfloatArray outputArray, jshortArray trimmed_audio, jintArray canvas);
+            jobject bufferPtr, jobject outputArrayPtr, jshortArray trimmed_audio, jobject canvasPtr);
 
 JNIEXPORT jintArray JNICALL
     Java_mariannelinhares_mnistandroid_MainActivity_getRowAndCol(JNIEnv *env, jclass clazz);
@@ -74,6 +74,11 @@ float* DCTArray = nullptr;
 float hanning_window[nfft] = {};
 bool hanning_window_initialized = false;
 float window_scaling_factor = 0;
+
+/* image parameters */
+#define PIXEL_WIDTH 400
+#define PIXEL_HEIGHT 300
+#define IMAGE_SIZE PIXEL_WIDTH*PIXEL_HEIGHT
 
 void ece420ProcessFrame(sample_buf *dataBuf) {
     // Keep in mind, we only have 20ms to process each buffer!
@@ -153,11 +158,11 @@ int trim_samples(float* samples, float** trimmed_samples, int num_samples, int f
     first_frame = first_frame < 0 ? 0 : first_frame; // make sure to set the first_frame in bounds
 
     int last_frame = first_frame + frameSize; // exclusive
-    int trimmedSize = (last_frame * step) - (first_frame * step);
+    int trimmedSize = (((last_frame-1) * step)+nfft) - (first_frame * step);
     float* trimmed_samples_ = new float[trimmedSize];
 
     int t_idx = 0; // idx in trimmed_samples_
-    for (int s_idx = first_frame*step; s_idx < last_frame*step; s_idx++) {
+    for (int s_idx = first_frame*step; s_idx < ((last_frame-1)*step)+nfft; s_idx++) {
         /* check if the index into the original samples array is out of bounds */
         if (s_idx >= num_samples)
             break;
@@ -348,10 +353,12 @@ Java_mariannelinhares_mnistandroid_MainActivity_resetParameters(JNIEnv *env, jcl
 }
 
 JNIEXPORT void JNICALL
-Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz, jobject bufferPtr, jfloatArray outputArray, jshortArray trimmed_audio, jintArray canvas) {
+Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass clazz, jobject bufferPtr, jobject outputArrayPtr, jshortArray trimmed_audio, jobject canvasPtr) {
     // TODO: implement performMFCC()
 
     int16_t * buffer = (jshort *) env->GetDirectBufferAddress(bufferPtr);
+    int* canvas = (jint *) env->GetDirectBufferAddress(canvasPtr);
+    float* outputArray = (jfloat *) env->GetDirectBufferAddress(outputArrayPtr);
 
     /* Initialize DCT and MelFilter arrays if not initialized */
     if (!coeffecients_initialized) {
@@ -408,14 +415,25 @@ Java_mariannelinhares_mnistandroid_MainActivity_performMFCC(JNIEnv *env, jclass 
 //    mfcc::normalizeData(final_output, final_output_size);
 
     /* draw the mfcc to the canvas */
-    uint32_t* image = new uint32_t[400*300];
-    mfcc::createImage(final_output, image, 400, 300, nn_data_rows, nn_data_cols);
+    int* image = new int[IMAGE_SIZE];
+//    int image [IMAGE_SIZE];
+    mfcc::createImage(final_output, image, PIXEL_WIDTH, PIXEL_HEIGHT, nn_data_rows, nn_data_cols);
 
-    env->SetIntArrayRegion(canvas, 0, 400*300, (int*)image);
+    /* manually set canvas since this function now wants to throw SIGABORT */
+//    env->SetIntArrayRegion(canvas, 0, 300*400, image);
+    for (int i = 0; i < 300*400; i++) {
+        canvas[i] = image[i];
+    }
+
     delete [] image;
 
     // Copy the final_output to the outputArray
-    env->SetFloatArrayRegion(outputArray, 0, final_output_size, final_output);
+//    env->SetFloatArrayRegion(outputArray, 0, final_output_size, (float_t *)final_output);
+    for (int i = 0; i < final_output_size; i++) {
+        outputArray[i] = final_output[i];
+    }
+
+
     delete [] final_output;
 
     return;
@@ -454,7 +472,7 @@ Java_mariannelinhares_mnistandroid_MainActivity_getMFCCParams(JNIEnv *env, jobje
     jint tempArray[] = {nn_data_rows, nn_data_cols, nfft, nfilt, noverlap, num_ceps, down_sampled_fs};
     env->SetIntArrayRegion(result, 0, 7, tempArray);
     return result;
-}
+};
 
 JNIEXPORT void JNICALL
 Java_mariannelinhares_mnistandroid_MainActivity_createWavFile(JNIEnv *env, jclass clazz,
@@ -473,4 +491,4 @@ Java_mariannelinhares_mnistandroid_MainActivity_createWavFile(JNIEnv *env, jclas
     delete [] wav_file_;
 
     return;
-}
+};
