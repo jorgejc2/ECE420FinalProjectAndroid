@@ -14,7 +14,7 @@ namespace mfcc {
 
     int createWav(int16_t* samples, uint8_t** wavFile, int num_samples, int sample_rate);
 
-    void createImage(float* samples, int* image_out, int pixel_width, int pixel_height, int samples_rows, int samples_cols);
+    void createImage(float* samples, uint32_t* image_out, int pixel_width, int pixel_height, int samples_rows, int samples_cols);
 
     void int16ToFloat(const int16_t* original_samples, float* new_samples, int num_samples);
 

@@ -96,7 +96,7 @@ namespace mfcc {
         return wavFileSize;
     }
 
-    void createImage(float* samples, int* image_out, int pixel_width, int pixel_height, int samples_rows, int samples_cols) {
+    void createImage(float* samples, uint32_t* image_out, int pixel_width, int pixel_height, int samples_rows, int samples_cols) {
         const int viridis_size = 20;
         int num_samples = samples_rows * samples_cols;
         uint32_t viridis_palette[viridis_size] = {
@@ -127,15 +127,15 @@ namespace mfcc {
         int num_above_10 = 0;
         int num_below_neg_10 = 0;
         for (int i = 0; i < num_samples; i++) {
-//            if (samples[i] > 50) {
-//                normalized_samples[i] = 50;
-//                num_above_10++;
-//            }
-//            else if (samples[i] < -50) {
-//                normalized_samples[i] = -50;
-//                num_below_neg_10++;
-//            }
-//            else
+            if (samples[i] > 10) {
+                normalized_samples[i] = 10;
+                num_above_10++;
+            }
+            else if (samples[i] < -10) {
+                normalized_samples[i] = -10;
+                num_below_neg_10++;
+            }
+            else
                 normalized_samples[i] = samples[i];
             }
         normalizeData(normalized_samples, num_samples);
@@ -146,8 +146,8 @@ namespace mfcc {
         int horizontal_count = 1;
         int vertical_count = 1;
         int x_idx, y_idx, viridis_idx;
-        int r, g, b;
-        int mask = 0x0000FF;
+        uint32_t r, g, b;
+        uint32_t mask = 0x0000FF;
 
         float percent;
         for (int pixel_row = 0; pixel_row < pixel_height; pixel_row++) {
