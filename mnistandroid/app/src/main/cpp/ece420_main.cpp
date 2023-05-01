@@ -208,6 +208,15 @@ int trim_samples(float* samples, float** trimmed_samples, int num_samples, int f
         trimmed_samples_[t_idx] = samples[s_idx];
         t_idx++;
     }
+    /* simpler method to store samples to test out later */
+//    int samples_idx;
+//    for (int i = 0; i < trimmedSize; i++) {
+//        samples_idx = first_frame * step + i;
+//        if (samples_idx >= num_samples)
+//            break;
+//        trimmed_samples_[i] = samples[first_frame * step + i];
+//    }
+
 
     /* redirect user pointer and return size of trimmed array */
     *trimmed_samples = trimmed_samples_;
