@@ -32,16 +32,7 @@ namespace mfcc {
 
     int downsample(float* samples, float** new_samples, int num_samples, int original_sampling_rate, int new_sampling_rate);
 
-    void applyFirFilter(float* samples, int num_samples);
-
     void applyFirFilterSeries(float* samples, int num_samples);
-
-    float firFilter(float sample);
-
-    void resetFirCircBuf();
-
-    void viewMelFilters(float* mel_filter_array, float* output, int mel_filter_size);
-
 }
 
 #endif //MNISTANDROID_MFCC_TOOLS_H

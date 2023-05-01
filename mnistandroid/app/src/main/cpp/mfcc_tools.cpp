@@ -35,6 +35,20 @@ typedef struct  WAV_HEADER
 
 namespace mfcc {
 
+    /*
+     * Description:
+     *          The samples to generate into a WAV file format.
+     * Inputs:
+     *          samples -- the audio samples to place into a WAV file format
+     *          num_samples -- the number of audio samples in the input array.
+     *          sample_rate -- the sampling rate used to obtain the audio samples
+     * Outputs:
+     *          wavFile -- the newly created WAV file
+     * Returns:
+     *          wavFileSize -- the size of the newly allocated WAV file
+     * Effects:
+     *          Allocates memory for the final output to be freed later to prevent memory leaks.
+     */
     int createWav(int16_t* samples, uint8_t** wavFile, int num_samples, int sample_rate) {
         /* setting up header */
 
@@ -96,6 +110,22 @@ namespace mfcc {
         return wavFileSize;
     }
 
+    /*
+     * Description:
+     *          Creates an image similar to Python's pcolormesh with its default color configurations (viridis pallette).
+     * Inputs:
+     *          samples -- the processed samples to generate an image from
+     *          pixel_width -- the desired width of the image
+     *          pixel_height -- the desired height of the image
+     *          samples_rows -- the number of rows in the processed samples
+     *          samples_cols -- the number of columns in the processed samples
+     * Outputs:
+     *          image_out -- the final image output
+     * Returns:
+     *          None
+     * Effects:
+     *          None
+     */
     void createImage(float* samples, uint32_t* image_out, int pixel_width, int pixel_height, int samples_rows, int samples_cols) {
         const int viridis_size = 20;
         int num_samples = samples_rows * samples_cols;
@@ -173,18 +203,55 @@ namespace mfcc {
         return;
     }
 
+    /*
+     * Description:
+     *          Converts samples from (int16_t) to (float) format.
+     * Inputs:
+     *          original_samples -- original audio samples in (int16_t) format
+     *          num_samples -- the number of audio samples
+     * Outputs:
+     *          new_samples -- the newly converted samples
+     * Returns:
+     *          None
+     * Effects:
+     *          None
+     */
     void int16ToFloat(const int16_t* original_samples, float* new_samples, int num_samples) {
         for (int i = 0; i < num_samples; i++)
-//            new_samples[i] = float((original_samples[i]>>2)/(32768.0));
             new_samples[i] = float(original_samples[i]/32768.0);
     }
 
+    /*
+     * Description:
+     *          Converts samples from (float) to (int16_t) format.
+     * Inputs:
+     *          original_samples -- original audio samples in (float) format
+     *          num_samples -- the number of audio samples
+     * Outputs:
+     *          new_samples -- the newly converted samples
+     * Returns:
+     *          None
+     * Effects:
+     *          None
+     */
     void floatToInt16(const float* original_samples, int16_t* new_samples, int num_samples) {
         for (int i = 0; i < num_samples; i++)
             new_samples[i] = int16_t(original_samples[i] * 32768.0);
     }
 
-    /* normalizes samples between 0 and 1 */
+    /*
+     * Description:
+     *          Normalizes an array between the float values of 0 to 1.
+     * Inputs:
+     *          samples -- the elements to normalize
+     *          num_samples -- the number of elements to normalize
+     * Outputs:
+     *          None
+     * Returns:
+     *          None
+     * Effects:
+     *          None
+     */
     void normalizeData(float* samples, int num_samples) {
         float max_val = std::numeric_limits<float>::min();
         float min_val = std::numeric_limits<float>::max();
@@ -214,7 +281,20 @@ namespace mfcc {
         return;
     }
 
-    /* MFCC algorithms */
+    /*
+     * Description:
+     *          Applies preemphasis to an array of audio samples.
+     * Inputs:
+     *          samples -- audio samples
+     *          num_samples -- number of audio samples
+     *          b -- preemphasis coefficient
+     * Outputs:
+     *          None
+     * Returns:
+     *          None
+     * Effects:
+     *          None
+     */
     void preemphasis(float* samples, int num_samples, float b) {
 
         float prev_sample = 0.0;
@@ -228,7 +308,18 @@ namespace mfcc {
     }
 
     /*
-     * Description
+     * Description:
+     *          Generates the Mel filter banks.
+     * Inputs:
+     *          nfft -- size of FFT to be used in the MFCC process
+     *          numFilters -- number of desired Mel filters
+     *          sampleRate -- sampling rate used to acquire the audio samples
+     * Outputs:
+     *          MelFilterArray -- the newly allocated Mel Filter banks
+     * Returns:
+     *          fbank_size -- the number of elements in the Mel Filter banks
+     * Effects:
+     *          Allocates memory for the final output to be freed to prevent a memory leak.
      */
     int getMelFilterBanks (float** MelFilterArray, int nfft, int numFilters, int sampleRate) {
 
@@ -286,6 +377,16 @@ namespace mfcc {
 
     /*
      * Description:
+     *          Generates the type II DCT.
+     * Inputs:
+     *          melCoefficients -- the number of desired Mel coefficients
+     *          numFilters -- the number of desired mel filter banks
+     * Outputs:
+     *          DCTArray -- the newly allocated type II DCT array
+     * Returns:
+     *          dct_size -- the number of elements in the computed DCT array
+     * Effects:
+     *          Allocates memory for the final output to be freed later to prevent a memory leak.
      */
     int calculateDCTCoefficients(float** DCTArray, int melCoeffecients, int numFilters) {
         int dct_size = melCoeffecients * numFilters;
@@ -319,33 +420,38 @@ namespace mfcc {
      *          None
      */
     void gemmMultiplication (const float* in_1, const float* in_2, float* out, int m, int k, int n) {
-//        #define in_1_(i1, i0) in_1[(i1 * k) + i0]
-//        #define in_2_(i1, i0) in_2[(i1 * n) + i0]
-//        #define out_(i1, i0) out[(i1 * n) + i0]
 
         /* iterate through input 1's rows (k) */
         for (int row = 0; row < m; row++) {
             /* iterate through input 2's columns (n) */
             for (int col = 0; col < n; col++) {
                 /* iterate through the shared dimension and calculate cell */
-//                out_(row, col) = 0.0; // initialize
                 out[row * n + col] = 0.0;
                 float sum = 0.0;
                 for (int i = 0; i < k; i++) {
-//                    float result = in_1_(row, i) * in_2_(i, col);
                     sum += in_1[row * k + i] * in_2[i*n + col];
-//                    out_(row, col) += (std::isinf(result) || std::isnan(result)) ? 0 : result;
-//                    out_(row, col) += result;
                 }
                 out[row *n + col] = sum;
             }
         }
 
-//        #undef in_1_
-//        #undef in_2_
-//        #undef out_
     };
 
+    /*
+     * Description:
+     *          Downsamples an array of audio samples from its original sampling rate to the new sampling rate.
+     * Inputs:
+     *          samples -- array of audio samples
+     *          num_samples -- the number of audio samples
+     *          original_sampling_rate -- the original sampling rate
+     *          new_sampling_rate -- newly desired sampling rate
+     * Outputs:
+     *          new_samples -- newly allocated samples at their new sampling rate
+     * Returns:
+     *          new_samples_size -- the number of downsampled samples
+     * Effects:
+     *          Allocates memory for the final output to be freed to prevent memory leaks.
+     */
     int downsample(float* samples, float** new_samples, int num_samples, int original_sampling_rate, int new_sampling_rate) {
 
         /* calculate the factor by which we have to down sample based on the original and new sampling rate */
@@ -365,17 +471,19 @@ namespace mfcc {
         return new_samples_size;
     }
 
-    void applyFirFilter(float* samples, int num_samples) {
-        /* use the firFilter helper function that applies the filter to an individual sample */
-        for (int i = 0; i < num_samples; i++) {
-            samples[i] = firFilter(samples[i]);
-        }
-        /* reset the global value used for the fir filter */
-        resetFirCircBuf();
-
-        return;
-    }
-
+    /*
+     * Description:
+     *          Applies the global FIR filter to an array of samples using the circular buffer approach.
+     * Inputs:
+     *          samples -- the array of audio samples
+     *          num_samples -- the number of audio samples
+     * Outputs:
+     *          None
+     * Returns:
+     *          None
+     * Effects:
+     *          None
+     */
     void applyFirFilterSeries(float* samples, int num_samples) {
         float circBuf_[N_TAPS] = {};
         int circBufIdx_ = 0;
@@ -396,44 +504,4 @@ namespace mfcc {
 
         return;
     }
-
-    // FirFilter Function
-    float firFilter(float sample) {
-        // This function simulates sample-by-sample processing. Here you will
-        // implement an FIR filter such as:
-        //
-        // y[n] = a x[n] + b x[n-1] + c x[n-2] + ...
-        //
-        // You will maintain a circular buffer to store your prior samples
-        // x[n-1], x[n-2], ..., x[n-k]. Suggested initializations circBuf
-        // and circBufIdx are given.
-        //
-        // Input 'sample' is the current sample x[n].
-        // ******************** START YOUR CODE HERE ******************** //
-        float output = 0.0;
-
-        /* insert sample into buffer */
-        circBuf[circBufIdx] = sample;
-
-        /* perform convolution */
-        for (int i = 0; i < N_TAPS; i++) {
-            output += fir_coefficients[i] * circBuf[ (((circBufIdx - i) % N_TAPS) + N_TAPS) % N_TAPS];
-        }
-        /* update pointer */
-        circBufIdx = (circBufIdx + 1) % N_TAPS;
-        // ********************* END YOUR CODE HERE ********************* //
-        return output;
-    }
-
-    void resetFirCircBuf() {
-        circBufIdx = 0;
-        for (int i = 0; i < N_TAPS; i++)
-            circBuf[i] = 0;
-    }
-
-    void viewMelFilters(float* mel_filter_array, float* output, int mel_filter_size) {
-        for (int i = 0; i < mel_filter_size; i++)
-            output[i] = mel_filter_array[i];
-    }
-
 };

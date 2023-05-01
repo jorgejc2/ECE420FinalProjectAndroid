@@ -349,27 +349,6 @@ import org.tensorflow.lite.Tensor;
             startPlay();   // this must include startRecording()
             statusView.setText(getString(R.string.status_echoing));
 
-            /* start timer */
-//            final Handler handler = new Handler();
-//            TimerTask doAsynchronousTask = new TimerTask() {
-//                @Override
-//                public void run() {
-//                    handler.post(new Runnable() {
-//                        public void run() {
-//                            try {
-//                                /* need to fix this but will be a function that writes to buffer, and timer task should stop
-//                                once buffer is filled all the way ( 3 second buffer )
-//                                 */
-//                                UpdateStftTask performStftUiUpdate = new UpdateStftTask();
-//                                performStftUiUpdate.execute();
-//                            } catch (Exception e) {
-//                                // TODO Auto-generated catch block
-//                            }
-//                        }
-//                    });
-//                }
-//            };
-//            timer.schedule(doAsynchronousTask, 0, 10); // execute every 10 ms
             /* count down timer implementation */
             new CountDownTimer(3000, 1000) {
 
@@ -538,12 +517,6 @@ import org.tensorflow.lite.Tensor;
                     float[][][][] inputArray = new float[1][mfcc_rows][mfcc_cols][1]; // Assuming your input is a 1D array
                     float[][] outputArray = new float[1][10]; // Assuming you have a classification problem with NUM_CLASSES classes
 
-//                    /* loading dummy data */
-//                    for (int row = 0; row < 12; row++) {
-//                        for (int col = 0; col < 48; col++) {
-//                            inputArray[0][row][col] = 0;
-//                        }
-//                    }
                     /* loads dummy data into the input array to test the tensor flow lite model */
                     if (use_dummy == 1) {
                         for (int i = 0; i < 48; i++) {

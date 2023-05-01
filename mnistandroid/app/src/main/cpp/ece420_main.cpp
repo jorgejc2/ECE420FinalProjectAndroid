@@ -75,6 +75,19 @@ float hanning_window[nfft] = {};
 bool hanning_window_initialized = false;
 float window_scaling_factor = 0;
 
+/*
+ * Description: Gets called periodically to store samples, creating a 3 second buffer with a
+ *              sampling rate of 48 kHz
+ * Inputs:
+ *          dataBuf -- buffer holding a portion of samples
+ * Outputs:
+ *          None
+ * Returns:
+ *          None
+ * Effects: Fills the threeSecondSamples global array and updates its global index. No difficult
+ *          processing should take place here since it must return before the next set of samples
+ *          are called.
+ */
 void ece420ProcessFrame(sample_buf *dataBuf) {
     // Keep in mind, we only have 20ms to process each buffer!
     struct timeval start;
@@ -105,6 +118,18 @@ void ece420ProcessFrame(sample_buf *dataBuf) {
     LOGD("Time delay: %ld us",  ((end.tv_sec * 1000000 + end.tv_usec) - (start.tv_sec * 1000000 + start.tv_usec)));
 }
 
+/*
+ * Description: This function determines if a frame has been voiced based on the energy in the frame
+ *              and a user defined energy threshold
+ * Inputs:
+ *          frame -- the array of samples in the frame
+ *          num_samples -- the number of samples in the frame
+ *          threshold -- the minimum threshold to meet for the frame to be considered voiced
+ * Outputs:
+ *          None
+ * Returns:
+ *          isVoiced -- 1 if the frame was voiced, 0 if not
+ */
 int processFrame(int16_t* frame, int num_samples, int threshold) {
     int isVoiced = 0;
 
@@ -119,6 +144,24 @@ int processFrame(int16_t* frame, int num_samples, int threshold) {
     return isVoiced;
 }
 
+/*
+ * Description: Using pitch detection, trim audio data to a desired frame size and surrounding a section
+ *              of voiced samples
+ * Inputs:
+ *          samples -- the array of audio samples
+ *          num_samples -- the number of samples in the given audio array
+ *          frameSize -- the desired number of frames to trim the samples
+ *          nfft -- the FFT size that will be used on the samples later in computation
+ *          noverlap -- the amount of overlap between frames
+ *          threshold -- the minimum threshold to meet for the frame to be considered voiced
+ *          frame_setback -- the number of frames to start before the first voiced frame is found
+ *  Outputs:
+ *          trimmed_samples -- the array to be allocated and hold the trimmed samples
+ *  Returns:
+ *          trimmedSize -- the number of elements given to trimmed_samples
+ *  Effects:
+ *          Allocates memory for trimmed_samples that must be freed later to prevent memory leaks
+ */
 int trim_samples(float* samples, float** trimmed_samples, int num_samples, int frameSize, int nfft, int noverlap,  int threshold, int frame_setback) {
 
     /* calculate the number of frames and step size */
@@ -171,6 +214,18 @@ int trim_samples(float* samples, float** trimmed_samples, int num_samples, int f
     return trimmedSize;
 }
 
+/*
+ * Description: Applies the Hanning window to a frame of audio samples
+ * Inputs:
+ *          frame -- the array of audio samples
+ * Outputs:
+ *          None
+ * Returns:
+ *          None
+ * Effects: Allocates the global hanning_window array as well as its window_scaling_factor in case
+ *          it needs to be used for some later computation. This scaled factor thus far is not needed
+ *          in the scope of the project.
+ */
 void applyHanning(float* frame) {
     /* initialize the global hanning window array if it has not already */
     if (!hanning_window_initialized) {
@@ -188,6 +243,19 @@ void applyHanning(float* frame) {
     return;
 }
 
+/*
+ * Description: Takes an array of samples and conducts the STFT on it given a set of parameters
+ * Inputs:
+ *          samples -- the array of samples
+ *          num_samples -- the number of samples given
+ *          sample_rate -- the sampling rate of the samples
+ *          oneSided -- if the real or FFT should be returned in each frame
+ * Outputs:
+ *          frequencies -- the fully computed STFT
+ * Returns:
+ *          stft_output_size -- the number of samples in the final output
+ * Effects: Allocates memory for frequencies that must be freed later to prevent a memory leak.
+ */
 int performSTFT(float *samples, float** frequencies, int num_samples, int sample_rate, bool oneSided){
 
     int noverlap_ = noverlap;
@@ -257,6 +325,19 @@ int performSTFT(float *samples, float** frequencies, int num_samples, int sample
     return stft_output_size;
 }
 
+/*
+ * Description: Performs the Mel Frequency Cepstral Coefficient algorithm on a set of samples.
+ * Inputs:
+ *          samples -- the array of audio samples
+ *          num_samples -- the number of samples given
+ *          preemphasis_b -- the coefficient to be used in the preemphasis step
+ * Outputs:
+ *          mfcc_frequencies -- the final mfcc output
+ *          ret_rows -- the number of rows in the final output
+ *          ret_cols -- the number of columns in the final output
+ * Returns:
+ *          ceps_output_size -- the number of elements in the final output
+ */
 int performMFCC(float* samples, float** mfcc_frequencies, int num_samples, float preemphasis_b, int &ret_rows, int &ret_cols) {
 
     /* apply preemphasis filter */
