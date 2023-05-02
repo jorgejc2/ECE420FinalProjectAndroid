@@ -512,16 +512,6 @@ import org.tensorflow.lite.Tensor;
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-
-                    /* now set objects to null to hopefully delete them */
-//                    trimmed_output = null;
-//                    raw_wav_file = null;
-//                    trimmed_wav_file = null;
-//                    trimmed_output_buffer = null;
-//                    buffer = null;
-//                    mfcc_output = null;
-
-
                     // Prepare input data (raw mfcc data)
 //                    float[][][][] inputArray = new float[1][mfcc_rows][mfcc_cols][1]; // Assuming your input is a 1D array
                     // Prepare input data (mfcc images)
