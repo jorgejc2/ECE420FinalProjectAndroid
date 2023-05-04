@@ -909,10 +909,10 @@ import org.tensorflow.lite.Interpreter;
             public void run() {
                 try {
                     // Load the TFLite model file
-//                    AssetFileDescriptor fileDescriptor = getAssets().openFd("my_model_12_48.tflite");
-//                    AssetFileDescriptor fileDescriptor = getAssets().openFd("my_model_12_28.tflite");
-//                    AssetFileDescriptor fileDescriptor = getAssets().openFd("my_model_12_28_normalized.tflite");
-                    AssetFileDescriptor fileDescriptor = getAssets().openFd("my_model_image_300_400_mfcc_12_28.tflite");
+                    /* this loads in the data set for Jorge */
+//                    AssetFileDescriptor fileDescriptor = getAssets().openFd("my_model_image_300_400_mfcc_12_28.tflite");
+                    /* this loads in the data set for Jonathan */
+                    AssetFileDescriptor fileDescriptor = getAssets().openFd("jonathan_model_image_300_400_mfcc_12_28.tflite");
                     FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
                     FileChannel fileChannel = inputStream.getChannel();
                     long startOffset = fileDescriptor.getStartOffset();
