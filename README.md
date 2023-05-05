@@ -5,7 +5,7 @@ This is the code by Jorge Chavez, Max Song, and Jonathan Chang for Android.
 
 The project takes a TensorFlow Lite model trained on a voice, and predicts what number was spoken. A script for generating a model is given in *'/tensorflow_model'*, but you must provide your own data. The Android app can also be used to curate a dataset as well. It is sufficient to procure your own dataset using the application, and generating a model using the *'tensorflow_model/spoken_digit_recognition_tensorflow_images.ipynb'* notebook. 
 
-For access to datasets, use the following Google Drive link. You must be affiliated with the University of Illinois at Urbana-Champaign to have access. TFLite models can be found under the *'/TFLiteModels'* directory in the Drive. 
+For access to datasets, use the following Google Drive [link](https://drive.google.com/drive/folders/1I8zHsvvcSEZ_BsW1GFkN8LPZ8RkQNcQM?usp=sharing). You must be affiliated with the University of Illinois at Urbana-Champaign to have access. TFLite models can be found under the *'/TFLiteModels'* directory in the Drive. 
 
 Make sure that any Tensor Flow Lite model is placed into the *'assets/'* folder in the Android application. The entire application can be found under the *'/mnistadnroid'* directory. When first running the application, there is a slight bug with the permissions. Once the app has been downloaded, all permissions must be enabled **outside** of the application. Note that because of the size of the TFLite models, uploading the app from Android Studio to your device might take 2-3 minutes. 
 
