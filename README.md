@@ -1,16 +1,9 @@
-# A_Guide_to_Running_Tensorflow_Models_on_Android
-This is the code for"A Guide to Running Tensorflow Models on Android" By SIraj Raval on Youtube
+# AudioMNIST on Android
+This is the code by Jorge Chavez, Max Song, and Jonathan Chang for Android. 
 
 # Overview
 
-This is the code for [this](https://youtu.be/kFWKdLOxykE) video on Youtube by Siraj Raval. 
-
-![Image](images/demo.png)
-
-Handwritten digits classification from MNIST on Android with TensorFlow.  
-
-If you want to make your own version of this app or want to knowhow to save your model and export it for Android or other devices check the very simple tutorial below.  The UI and expert-graph.pb model were taken from: https://github.com/miyosuda/TensorFlowAndroidMNIST, so thank you miyousuda.  
-
+The project takes a TensorFlow Lite model trained on a voice, and predicts what number was spoken. A script for generating a model is given in *'/tensorflow_model'*, but you must provide your own data. The Android app can also be used to curate a dataset as well. The directory called *'MusicClassification/'* contains notebooks and code that run CUDA in Python scipts and Jupyter notebooks, but is not refined and not necessary. It is sufficient to procure your own dataset using the application, and generating a model using the *'tensorflow_model/spoken_digit_recognition_tensorflow_images.ipynb'* notebook. One model is provided in the root directory.
 ## Dependencies
 
 All included
