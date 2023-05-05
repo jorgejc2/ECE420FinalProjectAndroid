@@ -360,7 +360,16 @@ import org.tensorflow.lite.Interpreter;
                     int trimmed_size = mfcc_params[8];
                     short [] trimmed_output = new short[trimmed_size];
 
+                    long startTime = System.nanoTime();
+
                     performMFCC(buffer, mfcc_output, trimmed_output, mfcc_canvas);
+
+
+                    // Calculate the elapsed time
+                    long elapsedTime = System.nanoTime() - startTime;
+
+                    // Convert the elapsed time to seconds
+                    double elapsedTimeInSeconds = elapsedTime / 1.0e9;
 
                     /* save the raw audio and trimmed audio as wav files */
                     buffer.rewind();
@@ -495,12 +504,14 @@ import org.tensorflow.lite.Interpreter;
                             third_label = i;
                         }
                     }
-
+                    
                     /* display the resultson the UI */
                     String tfres = String.format("1) Predicted Label: %d, Prob: %f\n" +
-                            "2) Predicted Label: %d, Prob: %f\n" +
-                            "3) Predicted Label: %d, Prob: %f\n", first_label, flat_outputArray[first_label],
-                            second_label, flat_outputArray[second_label], third_label, flat_outputArray[third_label]);
+                                    "2) Predicted Label: %d, Prob: %f\n" +
+                                    "3) Predicted Label: %d, Prob: %f\n" +
+                                    "Elapsed Time: %.3f seconds\n", first_label, flat_outputArray[first_label],
+                            second_label, flat_outputArray[second_label], third_label, flat_outputArray[third_label],
+                            elapsedTimeInSeconds);
                     tfliteResultText.setText(tfres);
                 }
 
